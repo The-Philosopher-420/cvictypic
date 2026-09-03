@@ -883,7 +883,7 @@ const FOODCHK=[['prot','🥩','Bielkoviny 4×'],['veg','🥦','Zelenina prvá'],
    NASTAVENIE SERVERA (voliteľné) – sem sa dá napevno vložiť adresa
    Google Apps Script web appky a heslo, aby nikto nič nemusel nastavovať.
    ===================================================================== */
-const DEFAULT_SERVER={url:'',key:''};
+const DEFAULT_SERVER={url:'',key:'',gh:null};
 
 /* =====================================================================
    POMOCNÉ
@@ -927,9 +927,26 @@ const LS={get(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null
 const K={profiles:'ctp:profiles',data:id=>'ctp:d:'+id,game:'ctp:game',brand:'ctp:brand',seed:'ctp:seed',aiSrv:id=>'ctp:ai:'+id,me:'ctp:me',chat:id=>'ctp:chat:'+id,server:'ctp:server',apikey:'ctp:apikey'};
 const SRV={url:'',key:'',chat:false,ok:null};
 const GAS=!!(typeof google!=='undefined'&&google.script&&google.script.run);
+/* GitHub ako zdieľaný server: dáta = JSON súbory v priečinku kv/ súkromného repozitára */
+async function ghApi(a,p={}){
+ const g=SRV.gh;if(!g||!g.token)throw new Error('chýba GitHub token');
+ const base=`https://api.github.com/repos/${g.owner}/${g.repo}/contents/kv/`;
+ const H={'Authorization':'Bearer '+g.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+ const fn=k=>encodeURIComponent(k.replace(/:/g,'__'))+'.json';
+ const dec=b=>decodeURIComponent(escape(atob(String(b).replace(/\n/g,''))));const enc=t=>btoa(unescape(encodeURIComponent(t)));
+ const getFile=async k=>{const r=await fetch(base+fn(k)+'?ts='+Date.now(),{headers:H,cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw new Error(r.status===401?'zlý GitHub token':'GitHub '+r.status);const j=await r.json();return {sha:j.sha,value:dec(j.content)};};
+ if(a==='ping'){const r=await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}?ts=${Date.now()}`,{headers:H,cache:'no-store'});if(!r.ok)throw new Error(r.status===401?'zlý GitHub token':r.status===404?'repozitár nenájdený / token bez prístupu':'GitHub '+r.status);return {ok:true,auth:true,chat:false};}
+ if(a==='get'){const f=await getFile(p.key);return {value:f?f.value:null};}
+ if(a==='set'){for(let i=0;i<3;i++){const f=await getFile(p.key);const body={message:'update '+p.key,content:enc(p.value)};if(f)body.sha=f.sha;const r=await fetch(base+fn(p.key),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},H),body:JSON.stringify(body)});if(r.ok)return {ok:true};if(r.status!==409&&r.status!==422)throw new Error('GitHub '+r.status);await new Promise(x=>setTimeout(x,400));}throw new Error('konflikt zápisu');}
+ if(a==='del'){const f=await getFile(p.key);if(!f)return {ok:true};await fetch(base+fn(p.key),{method:'DELETE',headers:Object.assign({'Content-Type':'application/json'},H),body:JSON.stringify({message:'delete '+p.key,sha:f.sha})});return {ok:true};}
+ if(a==='list'||a==='getall'){const r=await fetch(base+'?ts='+Date.now(),{headers:H,cache:'no-store'});if(r.status===404)return a==='list'?{keys:[]}:{items:{}};if(!r.ok)throw new Error('GitHub '+r.status);const arr=await r.json();const keys=(Array.isArray(arr)?arr:[]).filter(x=>x.name.endsWith('.json')).map(x=>decodeURIComponent(x.name.slice(0,-5)).replace(/__/g,':')).filter(k=>k.startsWith(p.prefix||''));if(a==='list')return {keys};const items={};await Promise.all(keys.map(async k=>{const f=await getFile(k);if(f)items[k]=f.value;}));return {items};}
+ if(a==='chat')throw new Error('chat cez GitHub nejde – zadaj API kľúč v nastaveniach');
+ throw new Error('neznáma akcia');
+}
 function gas(fn,...args){return new Promise((res,rej)=>{google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(new Error((e&&e.message)||String(e))))[fn](...args);});}
 async function rpc(a,payload={}){
  if(GAS){try{const j=await gas('apiS',Object.assign({a},payload));if(j&&j.error)throw new Error(j.error);SRV.ok=true;return j;}catch(e){SRV.ok=false;throw e;}}
+ if(SRV.gh){try{const j=await ghApi(a,payload);SRV.ok=true;return j;}catch(e){SRV.ok=false;throw e;}}
  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),15000);
  try{
   const res=await fetch(SRV.url,{method:'POST',body:JSON.stringify(Object.assign({a,k:SRV.key},payload)),signal:ctl.signal,redirect:'follow'});
@@ -957,11 +974,19 @@ const S={mode:'local',
 };
 function loadServerConfig(){
  if(GAS){SRV.url='google.script.run';SRV.key='';return;}
- const saved=LS.get(K.server);if(saved&&saved.url){SRV.url=saved.url;SRV.key=saved.key||'';}else if(DEFAULT_SERVER.url){SRV.url=DEFAULT_SERVER.url;SRV.key=DEFAULT_SERVER.key;}
- const h=location.hash;if(h&&h.includes('srv=')){const q=new URLSearchParams(h.slice(1));const u=q.get('srv');if(u){SRV.url=u;SRV.key=q.get('key')||'';LS.set(K.server,{url:SRV.url,key:SRV.key});try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}}
+ const saved=LS.get(K.server)||{};
+ if(saved.gh&&saved.gh.token){SRV.gh=saved.gh;SRV.url='github';}
+ else if(saved.url){SRV.url=saved.url;SRV.key=saved.key||'';}
+ else if(DEFAULT_SERVER.gh&&DEFAULT_SERVER.gh.token){SRV.gh=DEFAULT_SERVER.gh;SRV.url='github';}
+ else if(DEFAULT_SERVER.url){SRV.url=DEFAULT_SERVER.url;SRV.key=DEFAULT_SERVER.key;}
+ const h=location.hash;if(h&&(h.includes('srv=')||h.includes('gh=')||h.includes('aikey='))){const q=new URLSearchParams(h.slice(1));
+  const gh=q.get('gh');if(gh&&q.get('t')){const [owner,repo]=gh.split('/');SRV.gh={owner,repo,token:q.get('t')};SRV.url='github';LS.set(K.server,{gh:SRV.gh});}
+  const u=q.get('srv');if(u){SRV.url=u;SRV.key=q.get('key')||'';SRV.gh=null;LS.set(K.server,{url:SRV.url,key:SRV.key});}
+  const ak=q.get('aikey');if(ak)LS.set(K.apikey,ak);
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}
 }
-async function pingServer(){if(!SRV.url)return null;try{const j=await rpc('ping');SRV.chat=!!j.chat;SRV.auth=!!j.auth;return j;}catch(e){return null;}}
-function shareLink(){if(GAS)return location.href;return location.origin+location.pathname+'#srv='+encodeURIComponent(SRV.url)+'&key='+encodeURIComponent(SRV.key);}
+async function pingServer(){if(!SRV.url)return null;try{const j=await rpc('ping');SRV.chat=!!j.chat;SRV.auth=!!j.auth;SRV.lastErr='';return j;}catch(e){SRV.lastErr=e.message||String(e);return null;}}
+function shareLink(withAi){if(GAS)return location.href;let h=SRV.gh?'#gh='+encodeURIComponent(SRV.gh.owner+'/'+SRV.gh.repo)+'&t='+encodeURIComponent(SRV.gh.token):'#srv='+encodeURIComponent(SRV.url)+'&key='+encodeURIComponent(SRV.key);const ak=LS.get(K.apikey);if(withAi&&ak)h+='&aikey='+encodeURIComponent(ak);return location.origin+location.pathname+h;}
 
 /* =====================================================================
    STAV
@@ -974,7 +999,7 @@ const DEF_PROFILES=[
 ];
 function blankData(){return {v:2,u:0,checks:{},logs:[],body:[],health:{},food:{},meals:[],recipes:[],ai:{},plan:{},shop:{pins:{},done:{},qty:{},custom:{},persons:1},created:today()};}
 let saveT=null,saving=false;
-function save(){if(!ME)return;D.u=Date.now();LS.set(K.data(ME.id),D);clearTimeout(saveT);saveT=setTimeout(async()=>{saving=true;const ok=await S.set(K.data(ME.id),D);saving=false;if(!ok&&(SRV.url||window.storage))toast('⚠️ Nepodarilo sa uložiť na server – zatiaľ len v telefóne');},SRV.url?900:300);}
+function save(){if(!ME)return;D.u=Date.now();if(D.meals&&D.meals.length>150){D.meals.slice().sort((a,b)=>a.d<b.d?-1:1).slice(0,D.meals.length-150).forEach(m=>{delete m.th;});}LS.set(K.data(ME.id),D);clearTimeout(saveT);saveT=setTimeout(async()=>{saving=true;const ok=await S.set(K.data(ME.id),D);saving=false;if(!ok&&(SRV.url||window.storage))toast('⚠️ Nepodarilo sa uložiť na server – zatiaľ len v telefóne');},SRV.url?900:300);}
 async function saveProfiles(){LS.set(K.profiles,PROFILES);const ok=await S.set(K.profiles,PROFILES);if(!ok&&(SRV.url||window.storage))toast('⚠️ Profily sa neuložili na server');}
 function normData(d){const b=blankData();const o=Object.assign(b,d||{},{shop:Object.assign(b.shop,(d&&d.shop)||{})});o.meals=o.meals||[];o.recipes=o.recipes||[];o.ai=o.ai||{};o.plan=o.plan||{};o.logs=(o.logs||[]).map(migrateLog);return o;}
 async function loadData(id){const d=await S.get(K.data(id));return normData(d);}
@@ -1000,7 +1025,7 @@ function applyBrand(b){
    ===================================================================== */
 let editingProfiles=false,editingId=null,pendingImg='';
 function storageBanner(){
- if(SRV.url)return SRV.ok===false?'⚠️ Server neodpovedá – ukladám len do telefónu a skúsim to znova. Skontroluj internet alebo adresu servera (avatar → Server).':'';
+ if(SRV.url)return SRV.ok===false?'⚠️ Server neodpovedá ('+(SRV.lastErr||'')+') – ukladám len do telefónu a skúsim to znova. Skontroluj internet alebo nastavenie servera (avatar → Server).':'';
  if(window.storage)return S.mode==='claude'?'':'⚠️ Zdieľané úložisko funguje až po publikovaní artefaktu (tlačidlo Publish v Claude). Dovtedy sa dáta ukladajú len tu.';
  return '⚠️ Appka beží bez servera – dáta ostávajú len v tomto telefóne. Zdieľaný leaderboard zapneš: avatar → Server (návod v NAVOD.md).';
 }
@@ -1068,7 +1093,7 @@ $('hAva').addEventListener('click',openSettings);
    NASTAVENIA
    ===================================================================== */
 function openSettings(){
- const modeTxt=window.storage?(S.mode==='claude'?'Claude artefakt – zdieľané':'Claude artefakt – zatiaľ nepublikovaný'):GAS?(SRV.ok===false?'Google skript – neodpovedá':'Google skript + tabuľka – zdieľané'):SRV.url?(SRV.ok===false?'server – neodpovedá':'server (Google tabuľka) – zdieľané'):'len tento telefón';
+ const modeTxt=window.storage?(S.mode==='claude'?'Claude artefakt – zdieľané':'Claude artefakt – zatiaľ nepublikovaný'):GAS?(SRV.ok===false?'Google skript – neodpovedá':'Google skript + tabuľka – zdieľané'):SRV.gh?(SRV.ok===false?'GitHub – neodpovedá ('+(SRV.lastErr||'')+')':'GitHub repozitár '+SRV.gh.owner+'/'+SRV.gh.repo+' – zdieľané'):SRV.url?(SRV.ok===false?'server – neodpovedá':'server (Google tabuľka) – zdieľané'):'len tento telefón';
  const setsCount=(D.logs||[]).length;
  $('setBody').innerHTML=`
  <div class="row" style="margin-bottom:14px">${avaHTML(ME,'big')}<div class="grow"><div style="font:900 18px var(--disp)">${esc(ME.name)}</div><div class="small mute">${ME.bw?ME.bw+' kg · ':''}${ME.h?ME.h+' cm · ':''}${ME.age?ME.age+' r. · ':''}${{ '0-1':'0–1 rok','1-3':'1–3 roky','3+':'3+ roky'}[ME.exp]||''} · ${{bulk:'nabrať svaly',recomp:'svaly + spáliť tuk',cut:'schudnúť',maintain:'udržať'}[ME.goal]||''}${ME.dia?' · diastáza':''}</div></div></div>
@@ -1082,8 +1107,10 @@ function openSettings(){
  <p class="tiny mute" style="margin:6px 0 0">Ikona a názov sa zmenia pre všetkých. Na ploche telefónu sa nová ikona ukáže až po opätovnom pridaní appky na plochu.</p>
  <div class="eyebrow" style="margin-top:18px">Server · zdieľanie dát</div>
  <p class="small mute" style="margin:0 0 6px">Stav: <b>${modeTxt}</b></p>
- ${(window.storage||GAS)?(GAS?'<p class="tiny mute">Appka beží priamo z Google skriptu – server je nastavený automaticky.</p><div class="row" style="gap:8px;margin-top:8px"><button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button></div><div class="small" id="srvStatus" style="margin-top:6px"></div>':''):`<label class="lbl">Adresa servera (Google Apps Script, končí na /exec)</label><input id="srvUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(SRV.url)}">
- <label class="lbl">Heslo (SECRET zo skriptu)</label><input id="srvKey" placeholder="heslo" value="${esc(SRV.key)}">
+ ${(window.storage||GAS)?(GAS?'<p class="tiny mute">Appka beží priamo z Google skriptu – server je nastavený automaticky.</p><div class="row" style="gap:8px;margin-top:8px"><button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button></div><div class="small" id="srvStatus" style="margin-top:6px"></div>':''):`
+ <label class="lbl">GitHub repozitár s dátami (vlastník/názov)</label><input id="ghRepo" placeholder="The-Philosopher-420/cvictypic-data" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:'')}">
+ <label class="lbl">GitHub token (fine-grained, len na ten repozitár)</label><input id="ghTok" type="password" placeholder="github_pat_…" value="${esc(SRV.gh?SRV.gh.token:'')}">
+ <details class="acc" style="border:0"><summary class="tiny mute" style="padding:6px 0">Alebo Google Apps Script (staršia cesta)</summary><div class="body"><input id="srvUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(SRV.gh?'':SRV.url)}"><input id="srvKey" placeholder="heslo (SECRET)" value="${esc(SRV.key)}" style="margin-top:6px"></div></details>
  <div class="row" style="gap:8px;margin-top:10px"><button class="btn pri grow" id="srvSave">Uložiť a otestovať</button>${SRV.url?'<button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button>':''}</div>
  <div class="small" id="srvStatus" style="margin-top:6px"></div>`}
  <div class="eyebrow" style="margin-top:18px">AI · Claude</div>
@@ -1107,8 +1134,8 @@ function openSettings(){
  $('brandFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const icon=await shrinkImage(f,256,'image/png');BRAND=Object.assign({},BRAND||{},{icon});applyBrand(BRAND);await S.set(K.brand,BRAND);toast('Ikona zmenená ✔');openSettings();}catch(err){toast('Obrázok sa nepodarilo načítať');}};
  const br=$('brandReset');if(br)br.onclick=async()=>{BRAND=Object.assign({},BRAND||{},{icon:''});applyBrand(BRAND);await S.set(K.brand,BRAND);openSettings();};
  $('brandSave').onclick=async()=>{const n=$('brandName').value.trim()||'CVIČ TY PIČ';BRAND=Object.assign({},BRAND||{},{name:n});applyBrand(BRAND);await S.set(K.brand,BRAND);toast('Názov uložený ✔');};
- const su=$('srvSave');if(su)su.onclick=async()=>{const url=$('srvUrl').value.trim(),key=$('srvKey').value.trim();const st=$('srvStatus');if(!url){SRV.url='';SRV.key='';LS.del(K.server);st.textContent='Server vypnutý – dáta len v telefóne.';renderLogin();return;}SRV.url=url;SRV.key=key;LS.set(K.server,{url,key});st.textContent='Testujem…';const j=await pingServer();if(!j)st.innerHTML='<span style="color:var(--rose)">Server neodpovedá. Skontroluj, či je URL z „Nasadiť → Webová aplikácia“ a končí na /exec.</span>';else if(!j.auth)st.innerHTML='<span style="color:var(--amber)">Server beží, ale heslo nesedí (SECRET v skripte).</span>';else{st.innerHTML=`<span style="color:var(--mint)">✔ Spojené. Chat cez server: ${j.chat?'zapnutý':'vypnutý (bez API kľúča)'}.</span>`;S.mode='server';await saveProfiles();save();loadOthers().then(()=>{if(curTab==='home')renderLB();});openSettings();}};
- const sh=$('srvShare');if(sh)sh.onclick=async()=>{let l=shareLink();if(GAS){try{l=await gas('urlS');}catch(e){}}try{await navigator.clipboard.writeText(l);toast('Odkaz skopírovaný – pošli ho Matejovi');}catch(e){$('srvStatus').innerHTML='Skopíruj ručne:<br><span class="mono tiny" style="word-break:break-all">'+esc(l)+'</span>';}};
+ const su=$('srvSave');if(su)su.onclick=async()=>{const repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim(),url=$('srvUrl').value.trim(),key=$('srvKey').value.trim();const st=$('srvStatus');if(repo&&tok){const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}SRV.gh={owner,repo:name,token:tok};SRV.url='github';SRV.key='';LS.set(K.server,{gh:SRV.gh});}else if(url){SRV.gh=null;SRV.url=url;SRV.key=key;LS.set(K.server,{url,key});}else{SRV.gh=null;SRV.url='';SRV.key='';LS.del(K.server);st.textContent='Server vypnutý – dáta len v telefóne.';renderLogin();return;}st.textContent='Testujem…';const j=await pingServer();if(!j)st.innerHTML='<span style="color:var(--rose)">Server neodpovedá ('+esc(SRV.lastErr||'')+'). Skontroluj repozitár a token, alebo URL skriptu.</span>';else if(!j.auth)st.innerHTML='<span style="color:var(--amber)">Server beží, ale heslo nesedí (SECRET v skripte).</span>';else{st.innerHTML=`<span style="color:var(--mint)">✔ Spojené. Chat cez server: ${j.chat?'zapnutý':'vypnutý (bez API kľúča)'}.</span>`;S.mode='server';await saveProfiles();save();loadOthers().then(()=>{if(curTab==='home')renderLB();});openSettings();}};
+ const sh=$('srvShare');if(sh)sh.onclick=async()=>{let l=shareLink(!!LS.get(K.apikey));if(GAS){try{l=await gas('urlS');}catch(e){}}try{await navigator.clipboard.writeText(l);toast('Odkaz skopírovaný – pošli ho Matejovi (nastaví mu server'+(LS.get(K.apikey)?' aj AI':'')+')');}catch(e){}$('srvStatus').innerHTML='Odkaz pre kamošov (obsahuje prístup k dátam – posielaj len im):<br><span class="mono tiny" style="word-break:break-all">'+esc(l)+'</span>';};
  $('setExport').onclick=()=>{const blob=new Blob([JSON.stringify({profile:ME,data:D},null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`cvictypic-${ME.name}-${today()}.json`;a.click();};
  $('setImportBtn').onclick=()=>$('setImport').click();
  $('setImport').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o.data)throw 0;D=Object.assign(blankData(),o.data);save();renderAll();closeSheet('shSettings');toast('Dáta obnovené ✔');}catch(err){toast('Toto nie je záloha z Cvič ty pič');}};
