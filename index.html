@@ -1640,7 +1640,7 @@ async function moveLog(log,toId){
 let LOG=null,logSaveT=null;
 function newLogFor(ses,date){
  const last=(D.logs||[]).filter(x=>x.session===ses&&x.id!==(LOG&&LOG.id)).sort((a,b)=>a.date<b.date?1:-1)[0];
- const items=sessionExercises(ses).map(x=>{const prev=last?(last.items||[]).find(i=>i.id===x.id):null;const sets=prev&&validSets(prev).length?prev.sets.map(s=>({w:+s.w||0,r:+s.r||0,d:s.d?1:0})):[{w:0,r:0,d:0},{w:0,r:0,d:0}];return {id:x.id,nm:x.nm||'',sets,k:uid()};});
+ const items=sessionExercises(ses).map(x=>{const prev=last?(last.items||[]).find(i=>i.id===x.id):null;const ps=prev?validSets(prev):[];const n=Math.max(2,ps.length);const sets=Array.from({length:n},(_,i)=>({w:0,r:0,d:ps[i]&&ps[i].d?1:0,pw:ps[i]?+ps[i].w||0:0,pr:ps[i]?+ps[i].r||0:0}));return {id:x.id,nm:x.nm||'',sets,k:uid()};});
  return {id:uid(),date,session:ses,note:'',items,u:0};
 }
 function openLog(sesOrId){
@@ -1665,7 +1665,7 @@ function renderLogEditor(){
  const body=$('logBody');const exists=D.logs.some(x=>x.id===LOG.id);
  body.innerHTML=`
  <div class="fieldrow"><div><label class="lbl">Dátum</label><input type="date" id="logDate" value="${LOG.date}"></div><div><label class="lbl">Tréning</label><select id="logSes">${['UA','LA','UB','LB'].map(k=>`<option value="${k}"${k===LOG.session?' selected':''}>${SESSIONS[k].n} · ${SESSIONS[k].sub}</option>`).join('')}</select></div></div>
- <p class="tiny mute" style="margin:8px 0 4px">${exists?'Upravuješ uložené meranie – všetko sa ukladá priebežne.':'Nové meranie – uloží sa samo, keď zapíšeš prvú sériu. Základ sú 2 série, pridaj koľko chceš.'} Cvik s prázdnymi sériami = nerobili sme ho. Názov cviku môžeš prepísať. ☰ = poradie.</p>
+ <p class="tiny mute" style="margin:8px 0 4px">${exists?'Upravuješ uložené meranie – ukladá sa priebežne.':'Sivé čísla = tvoje posledné meranie, len napovedajú. Uloží sa, keď niečo zapíšeš.'} Prázdny cvik = nerobili sme ho.</p>
  <div id="logItems">${LOG.items.map(logItemHTML).join('')}</div>
  <div class="row" style="gap:8px;margin-top:10px"><select id="logAddSel" class="grow"><option value="">＋ Pridať cvik…</option>${Object.entries(EX).map(([id,e])=>`<option value="${id}">${esc(e.n)}</option>`).join('')}<option value="__custom">✏️ Vlastný názov cviku</option></select></div>
  <label class="lbl">Poznámka</label><input id="logNote" placeholder="napr. slabý spánok, nový stroj…" value="${esc(LOG.note||'')}">
@@ -1680,10 +1680,10 @@ function renderLogEditor(){
  bindLogItems();
  makeSortable($('logItems'),'.lex','[data-grip]',keys=>{const by={};LOG.items.forEach(it=>by[it.k]=it);LOG.items=keys.map(k=>by[k]).filter(Boolean);logFlush();});
 }
-function logFlushNow(){const idx=D.logs.findIndex(x=>x.id===LOG.id);if(logHasContent()){LOG.u=Date.now();if(idx<0)D.logs.push(LOG);else D.logs[idx]=LOG;}else if(idx>=0)D.logs.splice(idx,1);save();}
+function logFlushNow(){const idx=D.logs.findIndex(x=>x.id===LOG.id);if(logHasContent()){LOG.u=Date.now();LOG.items.forEach(it=>it.sets.forEach(s=>{delete s.pw;delete s.pr;}));if(idx<0)D.logs.push(LOG);else D.logs[idx]=LOG;}else if(idx>=0)D.logs.splice(idx,1);save();}
 function logItemHTML(it){
  const e=EX[it.id];const unit=e&&e.u==='s'?'s':e&&e.u==='m'?'m':'op.';const h=e?exHistory(D,it.id).filter(x=>x.d<LOG.date):[];const L=h.length?h[h.length-1]:null;const nx=e?claudeNext(it.id):null;
- return `<div class="lex" data-key="${it.k}" data-label="${esc(exName(it))}"><div class="hd"><span class="grip" data-grip>☰</span><input class="nm" value="${esc(exName(it))}" data-nm placeholder="názov cviku"><button class="rm" data-rmex aria-label="Odstrániť cvik">✕</button></div>${(L||nx)?`<div class="tiny" style="padding-left:42px;color:var(--mint)">${L?`naposledy ${L.w?L.w+' kg × ':''}${L.r} (${fmtD(L.d)})`:''}${nx&&(nx.w||nx.r)?`${L?' · ':''}<span style="color:var(--violet)">✦ ${nx.w?nx.w+' kg × ':''}${esc(nx.r)}</span>`:''}</div>`:''}<div class="sets">${it.sets.map((s,i)=>`<div class="setrow${s.d?' d':''}" data-i="${i}"><span class="idx">${i+1}</span><input type="number" inputmode="decimal" placeholder="kg" data-w value="${s.w||''}"><span class="x">×</span><input type="number" inputmode="numeric" placeholder="${unit}" data-r value="${s.r||''}"><button class="drop" data-drop aria-pressed="${s.d?'true':'false'}">DROP</button><button class="del" data-delset aria-label="Zmazať sériu">✕</button></div>`).join('')}</div><button class="addset" data-addset>＋ séria</button></div>`;
+ return `<div class="lex" data-key="${it.k}" data-label="${esc(exName(it))}"><div class="hd"><span class="grip" data-grip>☰</span><input class="nm" value="${esc(exName(it))}" data-nm placeholder="názov cviku"><button class="rm" data-rmex aria-label="Odstrániť cvik">✕</button></div>${(L||nx)?`<div class="tiny" style="padding-left:42px;color:var(--mint)">${L?`naposledy ${L.w?L.w+' kg × ':''}${L.r} (${fmtD(L.d)})`:''}${nx&&(nx.w||nx.r)?`${L?' · ':''}<span style="color:var(--violet)">✦ ${nx.w?nx.w+' kg × ':''}${esc(nx.r)}</span>`:''}</div>`:''}<div class="sets">${it.sets.map((s,i)=>`<div class="setrow${s.d?' d':''}" data-i="${i}"><span class="idx">${i+1}</span><input type="number" inputmode="decimal" placeholder="${s.pw?s.pw+' kg':'kg'}" data-w value="${s.w||''}"><span class="x">×</span><input type="number" inputmode="numeric" placeholder="${s.pr?s.pr+' '+unit:unit}" data-r value="${s.r||''}"><button class="drop" data-drop aria-pressed="${s.d?'true':'false'}">DROP</button><button class="del" data-delset aria-label="Zmazať sériu">✕</button></div>`).join('')}</div><button class="addset" data-addset>＋ séria</button></div>`;
 }
 function bindLogItems(){
  const root=$('logItems');
