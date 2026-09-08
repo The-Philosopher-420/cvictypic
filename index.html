@@ -345,6 +345,10 @@ sup.src{color:var(--amber);font-weight:700;font-size:10px;margin-left:2px}
 #conf{position:fixed;inset:0;pointer-events:none;z-index:70}
 @media print{.tabbar,#fab,header.top{display:none}}
 
+.sumlist{margin:0;padding-left:18px;font-size:14px}.sumlist li{margin:5px 0}
+.rec{padding:8px 0;border-top:1px solid var(--line)}.rec:first-of-type{border-top:0}.rec b{font-size:14px}.rec p{margin:2px 0 0;font-size:13px;color:var(--mute)}
+details.card.acc summary{padding:14px 0}
+.nutrd{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.nutrd div{border:1.5px solid var(--line);background:var(--bg2);border-radius:12px;padding:7px 4px;text-align:center;font:700 11px system-ui;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:58px}.nutrd div span{font-size:17px}.nutrd div small{font:600 10px var(--mono);color:var(--mute)}.nutrd .ok{border-color:rgba(52,211,153,.5);background:var(--mint-s)}.nutrd .low{border-color:rgba(255,181,71,.5);background:var(--amber-s)}.nutrd .miss{border-color:rgba(251,113,133,.5);background:var(--rose-s)}
 /* ===== v3 additions ===== */
 #shAsk{z-index:75}
 #shAsk .pan{max-height:70dvh}
@@ -529,6 +533,8 @@ sup.src{color:var(--amber);font-weight:700;font-size:10px;margin-left:2px}
       <div><label class="lbl">% tuku teraz (odhad)</label><input id="profBf" type="number" inputmode="decimal" placeholder="17"></div>
       <div><label class="lbl">% tuku cieľ</label><input id="profBfT" type="number" inputmode="decimal" placeholder="10"></div>
     </div>
+    <label class="lbl">Bežný deň mimo tréningu</label>
+    <div class="seg" id="profAct"><button data-v="sed" aria-pressed="true">Sedavý (PC, doma)</button><button data-v="act">Aktívny (na nohách)</button></div>
     <label class="lbl">Koľko rokov cvičíš so železom</label>
     <div class="seg" id="profExp"><button data-v="0-1" aria-pressed="true">0–1</button><button data-v="1-3">1–3</button><button data-v="3+">3+</button></div>
     <label class="lbl">Hlavný cieľ (podľa toho sa počítajú kalórie a bielkoviny)</label>
@@ -562,6 +568,15 @@ sup.src{color:var(--amber);font-weight:700;font-size:10px;margin-left:2px}
   <div class="pan"><div class="grab"></div><div class="shead"><h2 id="recTitle">Recept</h2><button class="x" data-close="shRecipe">✕</button></div><div id="recBody"></div></div>
 </div>
 
+<div class="sheet" id="shExport"><div class="bd" data-close="shExport"></div>
+  <div class="pan"><div class="grab"></div><div class="shead"><h2>Export pre Claude</h2><button class="x" data-close="shExport">✕</button></div><div id="expBody"></div></div>
+</div>
+<div class="sheet" id="shImport"><div class="bd" data-close="shImport"></div>
+  <div class="pan"><div class="grab"></div><div class="shead"><h2>Import od Claude</h2><button class="x" data-close="shImport">✕</button></div><div id="impBody"></div></div>
+</div>
+<div class="sheet" id="shForm"><div class="bd" data-close="shForm"></div>
+  <div class="pan"><div class="grab"></div><div class="shead"><h2 id="formTitle"></h2><button class="x" data-close="shForm">✕</button></div><div id="formBody"></div></div>
+</div>
 <div class="sheet" id="shChat"><div class="bd" data-close="shChat"></div>
   <div class="pan full">
     <div class="shead"><div class="ava" style="width:34px;height:34px;background:var(--blue);color:#0B1220;font-size:16px">✦</div><h2>Claude</h2><button class="x" data-close="shChat">✕</button></div>
@@ -807,7 +822,8 @@ const SOURCES=[
  ['Helms ER et al. 2014, J Int Soc Sports Nutr – rýchlosť chudnutia 0,5–1 % váhy/týždeň','Helms+2014+evidence-based+recommendations+natural+bodybuilding+contest+preparation'],
  ['Bull FC et al. 2020, Br J Sports Med – WHO odporúčania pohybu 2020','Bull+2020+World+Health+Organization+guidelines+physical+activity'],
  ['Mifflin MD et al. 1990, Am J Clin Nutr – rovnica pokojového výdaja (základ pre odhad kalórií)','Mifflin+1990+new+predictive+equation+resting+energy+expenditure'],
- ['Afonso J et al. 2021, Healthcare – silový tréning zlepšuje rozsah pohybu podobne ako strečing','Afonso+2021+strength+training+versus+stretching+range+of+motion+meta-analysis']
+ ['Afonso J et al. 2021, Healthcare – silový tréning zlepšuje rozsah pohybu podobne ako strečing','Afonso+2021+strength+training+versus+stretching+range+of+motion+meta-analysis'],
+ ['EFSA – Dietary Reference Values (referenčné hodnoty príjmu živín pre dospelých); frekvencie zdrojov v appke sú z nich odvodené','EFSA+dietary+reference+values+adults+summary']
 ];
 
 /* ---------- NÁKUP (Kaufland / Lidl) ----------
@@ -997,11 +1013,11 @@ const DEF_PROFILES=[
  {id:'bocian',name:'BociaN',img:'',bw:0,h:0,age:23,sex:'m',bf:0,bfT:0,goalText:'Vybudovať svaly od nuly. Byť zdravý, energický, silný, so zdravými kĺbmi, flexibilný, neskôr aj mobilita.',exp:'0-1',goal:'bulk',src:'apple',dia:false},
  {id:'agiraa',name:'Agiraa',img:'',bw:57,h:0,age:0,sex:'f',bf:0,bfT:0,goalText:'',exp:'0-1',goal:'maintain',src:'garmin',dia:false}
 ];
-function blankData(){return {v:2,u:0,checks:{},logs:[],body:[],health:{},food:{},meals:[],recipes:[],ai:{},plan:{},shop:{pins:{},done:{},qty:{},custom:{},persons:1},created:today()};}
+function blankData(){return {v:3,u:0,checks:{},logs:[],acts:[],body:[],health:{},food:{},meals:[],recipes:[],ai:{},plan:{},targets:null,shop:{pins:{},done:{},qty:{},custom:{},persons:1},created:today()};}
 let saveT=null,saving=false;
 function save(){if(!ME)return;D.u=Date.now();if(D.meals&&D.meals.length>150){D.meals.slice().sort((a,b)=>a.d<b.d?-1:1).slice(0,D.meals.length-150).forEach(m=>{delete m.th;});}LS.set(K.data(ME.id),D);clearTimeout(saveT);saveT=setTimeout(async()=>{saving=true;const ok=await S.set(K.data(ME.id),D);saving=false;if(!ok&&(SRV.url||window.storage))toast('⚠️ Nepodarilo sa uložiť na server – zatiaľ len v telefóne');},SRV.url?900:300);}
 async function saveProfiles(){LS.set(K.profiles,PROFILES);const ok=await S.set(K.profiles,PROFILES);if(!ok&&(SRV.url||window.storage))toast('⚠️ Profily sa neuložili na server');}
-function normData(d){const b=blankData();const o=Object.assign(b,d||{},{shop:Object.assign(b.shop,(d&&d.shop)||{})});o.meals=o.meals||[];o.recipes=o.recipes||[];o.ai=o.ai||{};o.plan=o.plan||{};o.logs=(o.logs||[]).map(migrateLog);return o;}
+function normData(d){const b=blankData();const o=Object.assign(b,d||{},{shop:Object.assign(b.shop,(d&&d.shop)||{})});o.meals=o.meals||[];o.recipes=o.recipes||[];o.ai=o.ai||{};o.plan=o.plan||{};o.acts=o.acts||[];o.logs=(o.logs||[]).map(migrateLog);o.logs.forEach(l=>(l.items||[]).forEach(it=>{it.k=it.k||uid();}));return o;}
 async function loadData(id){const d=await S.get(K.data(id));return normData(d);}
 async function loadOthers(){const all=await S.getAll('ctp:d:');OTHERS={};PROFILES.forEach(p=>{OTHERS[p.id]=p.id===ME?.id?D:(all[K.data(p.id)]||LS.get(K.data(p.id))||blankData());});}
 
@@ -1049,7 +1065,7 @@ function openProfileEditor(id){
  editingId=id;const p=id?PROFILES.find(x=>x.id===id):null;pendingImg=p?p.img:'';
  $('profTitle').textContent=p?'Upraviť profil':'Nový profil';
  $('profName').value=p?p.name:'';$('profBw').value=p&&p.bw?p.bw:'';$('profH').value=p&&p.h?p.h:'';$('profAge').value=p&&p.age?p.age:'';$('profBf').value=p&&p.bf?p.bf:'';$('profBfT').value=p&&p.bfT?p.bfT:'';$('profGoalText').value=p&&p.goalText?p.goalText:'';
- setSeg('profSex',p?(p.sex||'m'):'m');setSeg('profExp',p?p.exp:'0-1');setSeg('profGoal',p?p.goal:'bulk');setSeg('profSrc',p?p.src:'manual');
+ setSeg('profSex',p?(p.sex||'m'):'m');setSeg('profAct',p?(p.act||'sed'):'sed');setSeg('profExp',p?p.exp:'0-1');setSeg('profGoal',p?p.goal:'bulk');setSeg('profSrc',p?p.src:'manual');
  $('profDia').checked=!!(p&&p.dia);
  renderProfAva();openSheet('shProfile');
 }
@@ -1062,7 +1078,7 @@ function getSeg(id){const b=$(id).querySelector('[aria-pressed="true"]');return 
 document.addEventListener('click',e=>{const b=e.target.closest('.seg>button');if(!b||!b.dataset.v)return;const seg=b.parentElement;seg.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));seg.dispatchEvent(new CustomEvent('seg',{detail:b.dataset.v}));});
 $('profSave').addEventListener('click',async()=>{
  const name=$('profName').value.trim();if(!name){toast('Napíš meno');return;}
- const o={name,img:pendingImg,bw:+$('profBw').value||0,h:+$('profH').value||0,age:+$('profAge').value||0,sex:getSeg('profSex')||'m',bf:+$('profBf').value||0,bfT:+$('profBfT').value||0,goalText:$('profGoalText').value.trim(),exp:getSeg('profExp'),goal:getSeg('profGoal'),src:getSeg('profSrc'),dia:$('profDia').checked};
+ const o={name,img:pendingImg,bw:+$('profBw').value||0,h:+$('profH').value||0,age:+$('profAge').value||0,sex:getSeg('profSex')||'m',act:getSeg('profAct')||'sed',bf:+$('profBf').value||0,bfT:+$('profBfT').value||0,goalText:$('profGoalText').value.trim(),exp:getSeg('profExp'),goal:getSeg('profGoal'),src:getSeg('profSrc'),dia:$('profDia').checked};
  if(editingId){Object.assign(PROFILES.find(x=>x.id===editingId),o);if(ME&&ME.id===editingId)ME=PROFILES.find(x=>x.id===editingId);}
  else{o.id=name.toLowerCase().replace(/[^a-z0-9]/g,'')+'-'+uid().slice(0,4);o.created=today();PROFILES.push(o);}
  closeSheet('shProfile');renderLogin();if(ME){renderHeader();renderAll();}
@@ -1070,6 +1086,7 @@ $('profSave').addEventListener('click',async()=>{
 });
 async function login(id){
  ME=PROFILES.find(x=>x.id===id);if(!ME)return;
+ LOG=null;MEAL=null;REC=null;OTHERS={};SEEDSTATE=null;clearTimeout(saveT);clearTimeout(logSaveT);clearTimeout(mealSaveT);
  LS.set(K.me,id);
  D=normData(LS.get(K.data(id)));
  $('login').hidden=true;$('app').hidden=false;
@@ -1081,7 +1098,7 @@ async function login(id){
  aiAutoSync();
  loadOthers().then(()=>{if(curTab==='home')renderLB();});
 }
-function logout(){ME=null;D=null;LS.set(K.me,null);$('app').hidden=true;$('login').hidden=false;renderLogin();}
+function logout(){clearTimeout(saveT);clearTimeout(logSaveT);clearTimeout(mealSaveT);LOG=null;MEAL=null;OTHERS={};ME=null;D=null;LS.set(K.me,null);$('app').hidden=true;$('login').hidden=false;renderLogin();}
 function renderHeader(){
  $('hAva').innerHTML=ME.img?`<img src="${ME.img}" alt="">`:esc(initials(ME.name));
  $('hName').textContent=ME.name;
@@ -1093,53 +1110,53 @@ $('hAva').addEventListener('click',openSettings);
    NASTAVENIA
    ===================================================================== */
 function openSettings(){
- const modeTxt=window.storage?(S.mode==='claude'?'Claude artefakt – zdieľané':'Claude artefakt – zatiaľ nepublikovaný'):GAS?(SRV.ok===false?'Google skript – neodpovedá':'Google skript + tabuľka – zdieľané'):SRV.gh?(SRV.ok===false?'GitHub – neodpovedá ('+(SRV.lastErr||'')+')':'GitHub repozitár '+SRV.gh.owner+'/'+SRV.gh.repo+' – zdieľané'):SRV.url?(SRV.ok===false?'server – neodpovedá':'server (Google tabuľka) – zdieľané'):'len tento telefón';
- const setsCount=(D.logs||[]).length;
+ const modeTxt=window.storage?(S.mode==='claude'?'Claude artefakt – zdieľané':'Claude artefakt – zatiaľ nepublikovaný'):GAS?(SRV.ok===false?'Google skript – neodpovedá':'Google skript + tabuľka – zdieľané'):SRV.gh?(SRV.ok===false?'GitHub – neodpovedá ('+(SRV.lastErr||'')+')':'GitHub repozitár '+SRV.gh.owner+'/'+SRV.gh.repo+' – zdieľané'):SRV.url?(SRV.ok===false?'server – neodpovedá':'server – zdieľané'):'len tento telefón';
+ const lastImp=D.ai&&D.ai.importedAt?new Date(D.ai.importedAt).toLocaleString('sk'):null;
  $('setBody').innerHTML=`
- <div class="row" style="margin-bottom:14px">${avaHTML(ME,'big')}<div class="grow"><div style="font:900 18px var(--disp)">${esc(ME.name)}</div><div class="small mute">${ME.bw?ME.bw+' kg · ':''}${ME.h?ME.h+' cm · ':''}${ME.age?ME.age+' r. · ':''}${{ '0-1':'0–1 rok','1-3':'1–3 roky','3+':'3+ roky'}[ME.exp]||''} · ${{bulk:'nabrať svaly',recomp:'svaly + spáliť tuk',cut:'schudnúť',maintain:'udržať'}[ME.goal]||''}${ME.dia?' · diastáza':''}</div></div></div>
- <button class="btn wide" id="setEdit">✏️ Upraviť profil (váha, cieľ, fotka)</button>
- <div style="height:8px"></div>
- <button class="btn wide" id="setSwitch">👥 Prepnúť profil</button>
- <div class="eyebrow" style="margin-top:18px">Vzhľad appky</div>
- <div class="row" style="gap:8px"><button class="btn grow" id="brandIcon">🖼️ Zmeniť ikonu</button>${BRAND&&BRAND.icon?'<button class="btn danger" id="brandReset">Pôvodná</button>':''}</div>
- <input type="file" accept="image/*" id="brandFile" style="position:absolute;opacity:0;width:1px;height:1px">
- <label class="lbl">Názov appky</label><div class="row" style="gap:8px"><input id="brandName" value="${esc((BRAND&&BRAND.name)||'CVIČ TY PIČ')}" maxlength="24"><button class="btn sm" id="brandSave">Uložiť</button></div>
- <p class="tiny mute" style="margin:6px 0 0">Ikona a názov sa zmenia pre všetkých. Na ploche telefónu sa nová ikona ukáže až po opätovnom pridaní appky na plochu.</p>
- <div class="eyebrow" style="margin-top:18px">Server · zdieľanie dát</div>
- <p class="small mute" style="margin:0 0 6px">Stav: <b>${modeTxt}</b></p>
- ${(window.storage||GAS)?(GAS?'<p class="tiny mute">Appka beží priamo z Google skriptu – server je nastavený automaticky.</p><div class="row" style="gap:8px;margin-top:8px"><button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button></div><div class="small" id="srvStatus" style="margin-top:6px"></div>':''):`
- <label class="lbl">GitHub repozitár s dátami (vlastník/názov)</label><input id="ghRepo" placeholder="The-Philosopher-420/cvictypic-data" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:'')}">
- <label class="lbl">GitHub token (fine-grained, len na ten repozitár)</label><input id="ghTok" type="password" placeholder="github_pat_…" value="${esc(SRV.gh?SRV.gh.token:'')}">
- <details class="acc" style="border:0"><summary class="tiny mute" style="padding:6px 0">Alebo Google Apps Script (staršia cesta)</summary><div class="body"><input id="srvUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(SRV.gh?'':SRV.url)}"><input id="srvKey" placeholder="heslo (SECRET)" value="${esc(SRV.key)}" style="margin-top:6px"></div></details>
- <div class="row" style="gap:8px;margin-top:10px"><button class="btn pri grow" id="srvSave">Uložiť a otestovať</button>${SRV.url?'<button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button>':''}</div>
- <div class="small" id="srvStatus" style="margin-top:6px"></div>`}
- <div class="eyebrow" style="margin-top:18px">AI · Claude</div>
- <p class="small mute" style="margin:0 0 6px">Stav: <b>${AI.modeName()}</b></p>
- <button class="btn pri wide" id="setSyncAll">✦ Full AI sync – prepočítať všetko z nových dát</button>
- <div class="small" id="syncStatus" style="margin-top:6px;color:var(--mute)">${D.ai&&D.ai.lastSync?'Posledný sync: '+new Date(D.ai.lastSync).toLocaleString('sk'):'Zatiaľ nesynchronizované'}</div>
- ${window.storage?'':`<label class="lbl">API kľúč (console.anthropic.com) – ostáva len v tomto telefóne</label><input id="aiKey" type="password" placeholder="sk-ant-…" value="${esc(LS.get(K.apikey)||'')}">
- <div class="row" style="gap:8px;margin-top:8px"><button class="btn grow" id="aiKeySave">Uložiť kľúč</button><button class="btn" id="aiKeyTest">Test</button></div>
- <p class="tiny mute" style="margin:6px 0 0">Bez kľúča: chat sa otvorí v tvojej Claude appke s celým kontextom (zadarmo), ale AI sync a analýza fotiek jedla nepôjdu. S kľúčom platíš za spotrebu Anthropicu (text lacné, fotky drahšie). Alternatíva: kľúč do skriptu na serveri – potom funguje všetkým.</p>`}
- <div class="eyebrow" style="margin-top:18px">Dáta</div>
- <div class="fieldrow"><button class="btn" id="setExport">⬇️ Záloha (JSON)</button><button class="btn" id="setImportBtn">⬆️ Obnoviť zo zálohy</button></div>
- <input type="file" accept=".json,application/json" id="setImport" style="position:absolute;opacity:0;width:1px;height:1px">
- <div style="height:8px"></div>
- <button class="btn wide danger" id="setWipe">🗑️ Vymazať moje dáta (tréningy, merania, zdravie)</button>
- <p class="tiny mute" style="margin:14px 0 0">Dáta profilu vidia ostatní používatelia appky – tak funguje leaderboard.</p>`;
+ <div class="row" style="margin-bottom:14px">${avaHTML(ME,'big')}<div class="grow"><div style="font:900 18px var(--disp)">${esc(ME.name)}</div><div class="small mute">${ME.bw?ME.bw+' kg · ':''}${ME.h?ME.h+' cm · ':''}${ME.age?ME.age+' r. · ':''}${{ '0-1':'0–1 rok','1-3':'1–3 roky','3+':'3+ roky'}[ME.exp]||''} · ${{bulk:'nabrať svaly',recomp:'svaly + spáliť tuk',cut:'schudnúť',maintain:'udržať'}[ME.goal]||''}</div></div></div>
+ <div class="eyebrow">Claude · vyhodnotenie mimo appky</div>
+ <div class="row" style="gap:8px"><button class="btn pri grow" id="setExport">📤 Export pre Claude</button><button class="btn grow" id="setImport">📥 Import od Claude</button></div>
+ <p class="tiny mute" style="margin:6px 0 0">Export = všetky tvoje dáta + hotový prompt. Vlož ho Claudovi do samostatného chatu, jeho odpoveď (JSON blok) vlož do Importu – appka sa celá prestaví.${lastImp?' Posledný import: '+lastImp+'.':''}</p>
+ <div class="eyebrow" style="margin-top:18px">Profil</div>
+ <div class="row" style="gap:8px"><button class="btn grow" id="setEdit">✏️ Upraviť profil</button><button class="btn grow" id="setSwitch">👥 Prepnúť</button></div>
+ <details class="acc" style="margin-top:14px"><summary>⚙️ Pokročilé<span class="car">▸</span></summary><div class="body">
+  <div class="eyebrow">Vzhľad appky</div>
+  <div class="row" style="gap:8px"><button class="btn grow" id="brandIcon">🖼️ Zmeniť ikonu</button>${BRAND&&BRAND.icon?'<button class="btn danger" id="brandReset">Pôvodná</button>':''}</div>
+  <input type="file" accept="image/*" id="brandFile" style="position:absolute;opacity:0;width:1px;height:1px">
+  <label class="lbl">Názov appky</label><div class="row" style="gap:8px"><input id="brandName" value="${esc((BRAND&&BRAND.name)||'CVIČ TY PIČ')}" maxlength="24"><button class="btn sm" id="brandSave">Uložiť</button></div>
+  <div class="eyebrow" style="margin-top:18px">Server · zdieľanie dát</div>
+  <p class="small mute" style="margin:0 0 6px">Stav: <b>${modeTxt}</b></p>
+  ${(window.storage||GAS)?(GAS?'<div class="row" style="gap:8px;margin-top:8px"><button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button></div><div class="small" id="srvStatus" style="margin-top:6px"></div>':''):`
+  <label class="lbl">GitHub repozitár s dátami</label><input id="ghRepo" placeholder="vlastník/názov" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:'')}">
+  <label class="lbl">GitHub token</label><input id="ghTok" type="password" placeholder="github_pat_…" value="${esc(SRV.gh?SRV.gh.token:'')}">
+  <input id="srvUrl" type="hidden" value="${esc(SRV.gh?'':SRV.url)}"><input id="srvKey" type="hidden" value="${esc(SRV.key)}">
+  <div class="row" style="gap:8px;margin-top:10px"><button class="btn pri grow" id="srvSave">Uložiť a otestovať</button>${SRV.url?'<button class="btn" id="srvShare">🔗 Odkaz pre kamošov</button>':''}</div>
+  <div class="small" id="srvStatus" style="margin-top:6px"></div>`}
+  <div class="eyebrow" style="margin-top:18px">AI priamo v appke (voliteľné)</div>
+  <p class="small mute" style="margin:0 0 6px">Stav: <b>${AI.modeName()}</b></p>
+  ${window.storage?'':`<input id="aiKey" type="password" placeholder="sk-ant-… (API kľúč, ostáva v telefóne)" value="${esc(LS.get(K.apikey)||'')}"><div class="row" style="gap:8px;margin-top:8px"><button class="btn grow" id="aiKeySave">Uložiť kľúč</button><button class="btn" id="aiKeyTest">Test</button></div><div class="small" id="syncStatus" style="margin-top:6px;color:var(--mute)"></div>`}
+  <div class="eyebrow" style="margin-top:18px">Záloha</div>
+  <div class="fieldrow"><button class="btn" id="setBackup">⬇️ Záloha (JSON)</button><button class="btn" id="setRestoreBtn">⬆️ Obnoviť / zlúčiť</button></div>
+  <input type="file" accept=".json,.txt,.md,application/json,text/plain" id="setRestore" style="position:absolute;opacity:0;width:1px;height:1px">
+  <div style="height:8px"></div>
+  <button class="btn wide danger" id="setWipe">🗑️ Vymazať moje dáta</button>
+  <p class="tiny mute" style="margin:14px 0 0">Dáta profilu vidia ostatní používatelia appky – tak funguje leaderboard.</p>
+ </div></details>`;
+ $('setExport').onclick=()=>{closeSheet('shSettings');openExport();};
+ $('setImport').onclick=()=>{closeSheet('shSettings');openImport();};
  $('setEdit').onclick=()=>{closeSheet('shSettings');openProfileEditor(ME.id);};
- $('setSyncAll').onclick=async()=>{const st=$('syncStatus');st.textContent='Synchronizujem…';await aiSync('all',{status:t=>st.textContent=t});st.textContent='Hotovo ✔ '+new Date().toLocaleTimeString('sk');renderAll();};
- const ak=$('aiKeySave');if(ak){ak.onclick=()=>{LS.set(K.apikey,$('aiKey').value.trim());toast('Kľúč uložený (len v tomto zariadení)');openSettings();};$('aiKeyTest').onclick=async()=>{LS.set(K.apikey,$('aiKey').value.trim());$('syncStatus').textContent='Testujem…';try{const t=await AI.call({system:'Odpovedz jedným slovom.',messages:[{role:'user',content:'Povedz „funguje“.'}],max:20});$('syncStatus').textContent='✔ AI odpovedá: '+t;}catch(e){$('syncStatus').textContent='✗ '+e.message;}};}
  $('setSwitch').onclick=()=>{closeSheet('shSettings');logout();};
  $('brandIcon').onclick=()=>$('brandFile').click();
  $('brandFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const icon=await shrinkImage(f,256,'image/png');BRAND=Object.assign({},BRAND||{},{icon});applyBrand(BRAND);await S.set(K.brand,BRAND);toast('Ikona zmenená ✔');openSettings();}catch(err){toast('Obrázok sa nepodarilo načítať');}};
  const br=$('brandReset');if(br)br.onclick=async()=>{BRAND=Object.assign({},BRAND||{},{icon:''});applyBrand(BRAND);await S.set(K.brand,BRAND);openSettings();};
  $('brandSave').onclick=async()=>{const n=$('brandName').value.trim()||'CVIČ TY PIČ';BRAND=Object.assign({},BRAND||{},{name:n});applyBrand(BRAND);await S.set(K.brand,BRAND);toast('Názov uložený ✔');};
- const su=$('srvSave');if(su)su.onclick=async()=>{const repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim(),url=$('srvUrl').value.trim(),key=$('srvKey').value.trim();const st=$('srvStatus');if(repo&&tok){const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}SRV.gh={owner,repo:name,token:tok};SRV.url='github';SRV.key='';LS.set(K.server,{gh:SRV.gh});}else if(url){SRV.gh=null;SRV.url=url;SRV.key=key;LS.set(K.server,{url,key});}else{SRV.gh=null;SRV.url='';SRV.key='';LS.del(K.server);st.textContent='Server vypnutý – dáta len v telefóne.';renderLogin();return;}st.textContent='Testujem…';const j=await pingServer();if(!j)st.innerHTML='<span style="color:var(--rose)">Server neodpovedá ('+esc(SRV.lastErr||'')+'). Skontroluj repozitár a token, alebo URL skriptu.</span>';else if(!j.auth)st.innerHTML='<span style="color:var(--amber)">Server beží, ale heslo nesedí (SECRET v skripte).</span>';else{st.innerHTML=`<span style="color:var(--mint)">✔ Spojené. Chat cez server: ${j.chat?'zapnutý':'vypnutý (bez API kľúča)'}.</span>`;S.mode='server';await saveProfiles();save();loadOthers().then(()=>{if(curTab==='home')renderLB();});openSettings();}};
- const sh=$('srvShare');if(sh)sh.onclick=async()=>{let l=shareLink(!!LS.get(K.apikey));if(GAS){try{l=await gas('urlS');}catch(e){}}try{await navigator.clipboard.writeText(l);toast('Odkaz skopírovaný – pošli ho Matejovi (nastaví mu server'+(LS.get(K.apikey)?' aj AI':'')+')');}catch(e){}$('srvStatus').innerHTML='Odkaz pre kamošov (obsahuje prístup k dátam – posielaj len im):<br><span class="mono tiny" style="word-break:break-all">'+esc(l)+'</span>';};
- $('setExport').onclick=()=>{const blob=new Blob([JSON.stringify({profile:ME,data:D},null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`cvictypic-${ME.name}-${today()}.json`;a.click();};
- $('setImportBtn').onclick=()=>$('setImport').click();
- $('setImport').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o.data)throw 0;D=Object.assign(blankData(),o.data);save();renderAll();closeSheet('shSettings');toast('Dáta obnovené ✔');}catch(err){toast('Toto nie je záloha z Cvič ty pič');}};
- $('setWipe').onclick=async()=>{if(await ask('Naozaj vymazať všetky tvoje tréningy, merania a zdravotné dáta? Profil zostane.',{ok:'Vymazať',danger:true})){D=blankData();save();renderAll();closeSheet('shSettings');toast('Vymazané');}};
+ const su=$('srvSave');if(su)su.onclick=async()=>{const repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim(),url=$('srvUrl').value.trim(),key=$('srvKey').value.trim();const st=$('srvStatus');if(repo&&tok){const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}SRV.gh={owner,repo:name,token:tok};SRV.url='github';SRV.key='';LS.set(K.server,{gh:SRV.gh});}else if(url){SRV.gh=null;SRV.url=url;SRV.key=key;LS.set(K.server,{url,key});}else{SRV.gh=null;SRV.url='';SRV.key='';LS.del(K.server);st.textContent='Server vypnutý – dáta len v telefóne.';renderLogin();return;}st.textContent='Testujem…';const j=await pingServer();if(!j)st.innerHTML='<span style="color:var(--rose)">Server neodpovedá ('+esc(SRV.lastErr||'')+').</span>';else{st.innerHTML='<span style="color:var(--mint)">✔ Spojené.</span>';S.mode='server';await saveProfiles();save();loadOthers().then(()=>{if(curTab==='home')renderLB();});openSettings();}};
+ const sh=$('srvShare');if(sh)sh.onclick=async()=>{let l=shareLink(!!LS.get(K.apikey));if(GAS){try{l=await gas('urlS');}catch(e){}}try{await navigator.clipboard.writeText(l);toast('Odkaz skopírovaný – pošli ho kamošom');}catch(e){}$('srvStatus').innerHTML='Odkaz (obsahuje prístup k dátam – posielaj len kamošom):<br><span class="mono tiny" style="word-break:break-all">'+esc(l)+'</span>';};
+ const ak=$('aiKeySave');if(ak){ak.onclick=()=>{LS.set(K.apikey,$('aiKey').value.trim());toast('Kľúč uložený (len v tomto zariadení)');openSettings();};$('aiKeyTest').onclick=async()=>{LS.set(K.apikey,$('aiKey').value.trim());$('syncStatus').textContent='Testujem…';try{const t=await AI.call({system:'Odpovedz jedným slovom.',messages:[{role:'user',content:'Povedz „funguje“.'}],max:20});$('syncStatus').textContent='✔ AI odpovedá: '+t;}catch(e){$('syncStatus').textContent='✗ '+e.message;}};}
+ $('setBackup').onclick=()=>{downloadText(`cvictypic-${ME.name}-${today()}.json`,JSON.stringify({profile:ME,data:D},null,1));};
+ $('setRestoreBtn').onclick=()=>$('setRestore').click();
+ $('setRestore').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const txt=await f.text();const r=importAny(txt);toast(r);closeSheet('shSettings');renderAll();}catch(err){toast('Nepodarilo sa: '+(err.message||err),3000);}};
+ $('setWipe').onclick=async()=>{if(await ask('Naozaj vymazať všetky tvoje tréningy, merania, jedlo a zdravotné dáta? Profil zostane.',{ok:'Vymazať',danger:true})){D=blankData();save();renderAll();closeSheet('shSettings');toast('Vymazané');}};
  openSheet('shSettings');
 }
 
@@ -1219,12 +1236,13 @@ function scoreFor(p,d){
  return {sila:s.done,kardio:c.done,cons,gain,streak,food,pts,skip:s.skip};
 }
 /* ciele stravy podľa profilu (váha, výška, vek, cieľ) */
-function kcalTarget(p,bw){if(!bw||!p.h||!p.age)return null;const bmr=10*bw+6.25*p.h-5*p.age+(p.sex==='f'?-161:5);const adj={cut:.8,recomp:.9,bulk:1.1,maintain:1}[p.goal]||1;return Math.round(bmr*1.55*adj/10)*10;}
+function kcalTarget(p,bw){if(!bw||!p.h||!p.age)return null;const bmr=10*bw+6.25*p.h-5*p.age+(p.sex==='f'?-161:5);const act=p.act==='act'?1.6:1.45;const adj={cut:.8,recomp:.9,bulk:1.1,maintain:1}[p.goal]||1;return Math.round(bmr*act*adj/10)*10;}
 function targets(p,bw){
- const kcal=kcalTarget(p,bw);const pk=p.goal==='cut'||p.goal==='recomp'?2.0:1.8;
- const prot=bw?Math.round(bw*pk):null;const fat=bw?Math.round(bw*0.9):null;
- const carb=(kcal&&prot&&fat)?Math.max(80,Math.round((kcal-prot*4-fat*9)/4)):null;
- return {kcal,p:prot,f:fat,c:carb,fi:30,water:bw?r1(bw*.033):null,pk};
+ const o=(D&&D.targets)||null;
+ const kcal=(o&&o.kcal)||kcalTarget(p,bw);const pk=p.goal==='cut'||p.goal==='recomp'?2.0:1.8;
+ const prot=(o&&o.p)||(bw?Math.round(bw*pk):null);const fat=(o&&o.f)||(bw?Math.round(bw*0.9):null);
+ const carb=(o&&o.c)||((kcal&&prot&&fat)?Math.max(80,Math.round((kcal-prot*4-fat*9)/4)):null);
+ return {kcal,p:prot,f:fat,c:carb,fi:(o&&o.fi)||30,water:(o&&o.water)||(bw?r1(bw*.033):null),pk,src:o?'claude':'model'};
 }
 function mealTotals(day){const tot={kcal:0,p:0,c:0,f:0,fi:0};(D.meals||[]).filter(m=>m.d===day).forEach(m=>{const t=m.tot||{};['kcal','p','c','f','fi'].forEach(k=>tot[k]+=+t[k]||0);});return tot;}
 function mealsAvg(days){const from=addDays(today(),-days+1);const tot={kcal:0,p:0,c:0,f:0,fi:0};let n=0;for(let i=0;i<days;i++){const day=addDays(from,i);if(day>today())break;const ms=(D.meals||[]).filter(m=>m.d===day);if(!ms.length)continue;n++;ms.forEach(m=>{const t=m.tot||{};['kcal','p','c','f','fi'].forEach(k=>tot[k]+=+t[k]||0);});}if(!n)return null;Object.keys(tot).forEach(k=>tot[k]=Math.round(tot[k]/n));tot.days=n;return tot;}
@@ -1308,7 +1326,7 @@ function credoFallback(){
  const tpl=grp.t[h%grp.t.length];
  return tpl.replace(/\{(\w+)\}/g,(m,k)=>c[k]!=null?String(c[k]):'');
 }
-function credoText(){const a=D.ai&&D.ai.credo;if(a&&a.d===today()&&a.text)return {text:a.text,ai:true};return {text:credoFallback(),ai:false};}
+function credoText(){const a=D.ai&&D.ai.credo;if(a&&a.text&&daysBetween(a.d,today())<=7)return {text:a.text,ai:true,d:a.d};return {text:credoFallback(),ai:false};}
 
 /* =====================================================================
    DOMOV
@@ -1321,32 +1339,31 @@ function renderHome(){
  const cDone=Object.entries(w).filter(([k,v])=>v.s==='done'&&(v.t||(BLOCKS.find(x=>x.k===k)||{}).t)==='kardio').length;
  const food7=foodAvg(D,7);const sc=scoreFor(ME,D);const gain=sc.gain;const ton=estTonnage30(D);
  const bw=latestBw(ME,D);const h=new Date().getHours();const hi=h<10?'Dobré ráno':h<18?'Ahoj':'Dobrý večer';
- const mus=MUSCLE[ME.exp]||MUSCLE['0-1'];const months=Math.max(0,daysBetween(D.created||t,t)/30.4);const musO=r1(mus.o*months),musP=r1(mus.p*months);
  const miss=[!bw&&'váhu',!ME.h&&'výšku',!ME.age&&'vek'].filter(Boolean);
- const cr=credoText();
+ const cr=credoText();const ai=D.ai||{};const fresh=x=>x&&x.d&&daysBetween(x.d,t)<=14;
+ const avg=mealsAvg(7);const tg=targets(ME,bw);
  sec.innerHTML=`
- <div class="card credo"><p class="ct">${esc(cr.text)}</p><div class="cm"><span>${cr.ai?'✦ Claude · kredo dňa':'kredo dňa · '+(AI.mode()?'AI sync ho zajtra napíše nanovo':'bez AI – banka hlášok')}</span>${aiSyncBtn('home')}</div></div>
- ${SEEDSTATE&&!SEEDSTATE.done?`<div class="seedbox"><b>📥 Mám 2 merania z chatu</b> (21. 8. Upper B: lat pulldown 45 kg…, 24. 8. Upper A: arm press 30 kg…). Podľa váh vyzerajú na Mateja – komu ich mám zapísať?<div class="row wrap" style="gap:6px;margin-top:8px">${PROFILES.map(p=>`<button class="btn sm" data-seed="${p.id}">${esc(p.name)}</button>`).join('')}<button class="btn sm ghost" data-seed="none">Zahodiť</button></div></div>`:''}
- ${miss.length?`<div class="banner row" style="gap:10px"><span class="grow">⚖️ Doplň ${miss.join(', ')} – appka si podľa toho prispôsobí bielkoviny, kalórie, míľniky aj odhady.</span><button class="btn sm" id="fillProf" style="border-color:var(--amber);color:var(--amber);background:transparent">Doplniť</button></div>`:''}
+ <div class="card credo"><p class="ct">${esc(cr.text)}</p><div class="cm"><span>${cr.ai?'✦ Claude · '+fmtD(cr.d):'kredo dňa'}</span></div></div>
+ ${fresh(ai.warnings)&&ai.warnings.items.length?`<div class="banner">⚠️ ${ai.warnings.items.map(esc).join(' · ')}</div>`:''}
+ ${fresh(ai.summary)?`<div class="card"><div class="eyebrow">✦ Claude · zhodnotenie ${fmtD(ai.summary.d)}</div><ul class="sumlist">${ai.summary.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:`<div class="card flat" style="display:flex;gap:10px;align-items:center"><span class="grow small">Zhodnotenie od Claude: avatar → <b>Export pre Claude</b> → odpoveď vlož do Importu.</span><button class="btn sm" id="homeExport">📤</button></div>`}
+ ${miss.length?`<div class="banner row" style="gap:10px"><span class="grow">⚖️ Doplň ${miss.join(', ')} – bez toho neviem počítať ciele a míľniky.</span><button class="btn sm" id="fillProf" style="border-color:var(--amber);color:var(--amber);background:transparent">Doplniť</button></div>`:''}
  <div class="card hero">
   <div class="hi">${hi}, ${esc(ME.name)}.</div>
   <div class="small mute" style="margin-bottom:12px">${weekLine(sDone,cDone)}</div>
   <div class="rings">
    ${ring(sDone/4,'#5B8CFF',`${sDone}<span style="font-size:11px;color:var(--mute)">/4</span>`,'sila','Tento týždeň')}
    ${ring(cDone/4,'#FFB547',`${cDone}<span style="font-size:11px;color:var(--mute)">/4</span>`,'kardio','HIIT + LISS')}
-   ${ring(food7/100,'#34D399',`${Math.round(food7)}<span style="font-size:11px;color:var(--mute)">%</span>`,'strava','7 dní')}
+   ${ring(avg&&tg.p?avg.p/tg.p:food7/100,'#34D399',avg&&tg.p?`${Math.round(avg.p/tg.p*100)}<span style="font-size:11px;color:var(--mute)">%</span>`:`${Math.round(food7)}<span style="font-size:11px;color:var(--mute)">%</span>`,avg&&tg.p?'bielkoviny':'strava','7 dní')}
   </div>
  </div>
  <div class="tiles">
-  <div class="tile blue"><div class="k">Tréningov za 30 dní</div><div class="n">${sc.sila}<small> sila</small></div><div class="s">${sc.kardio} kardio · konzistencia ${sc.cons} %</div></div>
-  <div class="tile mint"><div class="k">Sila od začiatku</div><div class="n">${gain?(gain>0?'+':'')+r1(gain):'—'}<small>${gain?' %':''}</small></div><div class="s">${gain?'priemer odhad. 1RM naprieč cvikmi':'zapíš 2 merania, nech je čo porovnať'}</div></div>
-  <div class="tile amber"><div class="k">Séria týždňov</div><div class="n">${sc.streak}<small> 🔥</small></div><div class="s">týždne s ≥ 3 silovými</div></div>
-  <div class="tile violet"><div class="k">Odhad svalov od štartu</div><div class="n">+${musP}–${musO}<small> kg</small></div><div class="s">${months<1?'ešte je skoro – vydrž mesiac':'model pre '+({'0-1':'začiatočníka','1-3':'mierne pokročilého','3+':'pokročilého'}[ME.exp])} [27]</div></div>
+  <div class="tile blue"><div class="k">Tréningov · 30 dní</div><div class="n">${sc.sila}</div><div class="s">${sc.kardio} kardio · ${sc.cons} % konzistencia</div></div>
+  <div class="tile mint"><div class="k">Sila od začiatku</div><div class="n">${gain?(gain>0?'+':'')+r1(gain)+' %':'—'}</div><div class="s">${gain?'odhad. 1RM':'treba 2 merania'}</div></div>
+  <div class="tile amber"><div class="k">Séria týždňov</div><div class="n">${sc.streak} 🔥</div><div class="s">≥ 3 silové / týždeň</div></div>
+  <div class="tile violet"><div class="k">Tonáž · 30 dní</div><div class="n">${ton?(ton/1000).toFixed(1)+' t':'—'}</div><div class="s">${avg?avg.kcal+' kcal/deň · '+avg.p+' g B':'jedlo bez záznamov'}</div></div>
  </div>
- <div class="card">
-  <div class="row"><div class="grow"><div class="eyebrow">Tonáž za 30 dní (odhad)</div><div style="font:900 26px var(--disp)">${ton?(ton/1000).toFixed(1)+' t':'—'}</div><div class="small mute">${ton?'každý kotúč = 1 tona · potiahni prstom':'zapíš meranie, aby appka vedela, čo dvíhaš'}</div></div><div class="plates3d" id="plates"></div></div>
- </div>
- <div class="card" id="lbCard"><div class="row" style="margin-bottom:8px"><h2 class="grow">Leaderboard · 30 dní</h2><button class="btn ghost sm" id="lbRefresh">↻</button></div><div class="lb" id="lb"></div><p class="tiny mute" style="margin:10px 56px 0 0">Body = silové tréningy ×10 + kardio ×4 + konzistencia/5 + % sily ×2 + séria ×5 + strava/10. Každý štartuje z nuly – porovnáva sa zlepšenie, nie kilá.</p><button class="egg" id="eggBtn" aria-label="Minihra"><img src="${$('sticker').src}" alt=""></button></div>
+ <div class="card" id="lbCard"><div class="row" style="margin-bottom:8px"><h2 class="grow">Leaderboard · 30 dní</h2><button class="btn ghost sm" id="lbRefresh">↻</button></div><div class="lb" id="lb"></div><p class="tiny mute" style="margin:10px 56px 0 0">Body = tréningy ×10 + kardio ×4 + konzistencia/5 + % sily ×2 + séria ×5. Porovnáva sa zlepšenie, nie kilá.</p><button class="egg" id="eggBtn" aria-label="Minihra"><img src="${$('sticker').src}" alt=""></button></div>
+ ${fresh(ai.recs)&&ai.recs.items.length?`<div class="card"><div class="eyebrow">✦ Claude · odporúčania</div>${ai.recs.items.map(r=>`<div class="rec"><b>${esc(r.t)}</b><p>${esc(r.d)}</p></div>`).join('')}</div>`:''}
  <div class="card">
   <h2>Progres</h2>
   <div class="seg" id="pPeriod" style="margin-bottom:8px"><button data-v="7">7 dní</button><button data-v="28" aria-pressed="true">4 týž.</button><button data-v="90">3 mes.</button><button data-v="365">Rok</button></div>
@@ -1354,20 +1371,20 @@ function renderHome(){
   <div id="pBody"></div>
  </div>
  <div class="card" id="assess"></div>
- <div class="card"><h2>Míľniky · násobky tvojej váhy</h2><p class="small mute" style="margin:0 0 8px">Orientačné – stroje majú rôzne prevody, preto sa porovnávaj hlavne sám so sebou.${bw?'':' Zadaj si váhu v profile, nech to vie počítať.'}</p><div id="miles"></div></div>
- <div class="card"><h2>Odhad vs. realita</h2><p class="small mute" style="margin:0 0 8px">Pesimistický a optimistický model podľa tvojej skúsenosti [27]. Zelené = predbiehaš aj optimistický odhad.</p><div id="cmp"></div></div>`;
+ <details class="card acc" style="padding:0 14px"><summary>Viac čísel – míľniky, odhad vs. realita<span class="car">▸</span></summary><div class="body">
+  <div class="eyebrow">Míľniky · násobky tvojej váhy</div><div id="miles"></div>
+  <div class="eyebrow" style="margin-top:14px">Odhad vs. realita</div><div id="cmp"></div></div></details>`;
  const fp=$('fillProf');if(fp)fp.onclick=()=>openProfileEditor(ME.id);
- sec.querySelectorAll('[data-seed]').forEach(b=>b.onclick=()=>applySeed(b.dataset.seed));
+ const he=$('homeExport');if(he)he.onclick=()=>openExport();
  setSeg('pPeriod',String(HOME.period));setSeg('pView',HOME.view);
  $('pPeriod').addEventListener('seg',e=>{HOME.period=+e.detail;renderProgress();});
  $('pView').addEventListener('seg',e=>{HOME.view=e.detail;renderProgress();});
- $('lbRefresh').onclick=async()=>{$('lbRefresh').textContent='…';await loadOthers();renderLB();$('lbRefresh').textContent='↻';toast('Leaderboard obnovený');};
+ $('lbRefresh').onclick=async()=>{$('lbRefresh').textContent='…';await loadOthers();renderLB();$('lbRefresh').textContent='↻';};
  $('eggBtn').onclick=()=>openGame();
- bindSyncBtns(sec);
- animRings();renderPlates(ton);renderLB();renderProgress();renderAssess(sc,bw);renderMiles(bw);renderCmp();
+ animRings();renderLB();renderProgress();renderAssess(sc,bw);renderMiles(bw);renderCmp();
 }
-function aiSyncBtn(scope){return `<button class="aisync" data-sync="${scope}" title="Prepočítať túto kategóriu z nových dát">✦ AI sync</button>`;}
-function bindSyncBtns(root){root.querySelectorAll('[data-sync]').forEach(b=>b.onclick=async()=>{if(b.classList.contains('busy'))return;b.classList.add('busy');const old=b.innerHTML;b.innerHTML='<span class="dot"></span> synchronizujem';await aiSync(b.dataset.sync,{status:t=>{b.innerHTML='<span class="dot"></span> '+esc(t);}});b.classList.remove('busy');b.innerHTML=old;showTab(curTab);});}
+function aiSyncBtn(){return '';}
+function bindSyncBtns(root){root.querySelectorAll('[data-sync]').forEach(b=>b.remove());}
 function weekLine(s,c){if(s>=4)return 'Všetky 4 silové máš. Toto je ten týždeň, ktorý robí rozdiel.';if(s===3)return 'Ešte jeden silový a týždeň je kompletný.';if(s===0&&c===0)return 'Nový týždeň. Potiahni prvú kartu v Tréningu doľava.';return `${4-s} silové ${4-s===1?'ostáva':'ostávajú'} do plného týždňa.`;}
 function renderPlates(ton){
  const n=clamp(Math.round(ton/1000),0,14);const el=$('plates');
@@ -1418,7 +1435,9 @@ function renderProgress(){
 }
 function renderAssess(sc,bw){
  const out=[];const t=today();
- const ai=D.ai&&D.ai.assess;if(ai&&ai.text&&daysBetween(ai.d,t)<=3)out.push(`<span class="badge ai">✦ Claude</span> ${esc(ai.text)}`);
+ const ai=D.ai&&D.ai.assess;if(ai&&ai.text&&daysBetween(ai.d,t)<=14){out.push(`<span class="badge ai">✦ Claude ${fmtD(ai.d)}</span> ${esc(ai.text)}`);}
+ const nu=D.ai&&D.ai.nutrients;if(nu&&daysBetween(nu.d,t)<=14&&(nu.missing||[]).length)out.push(`Mikroživiny (Claude): chýba <b>${nu.missing.map(esc).join(', ')}</b>${nu.note?' – '+esc(nu.note):''}`);
+ const hn=D.ai&&D.ai.health;if(hn&&daysBetween(hn.d,t)<=14)out.push(esc(hn.note));
  if(ME.bf&&ME.bfT&&bw&&ME.bf>ME.bfT){const fatNow=bw*ME.bf/100,lean=bw-fatNow;const target=lean/(1-ME.bfT/100);const toLose=bw-target;const wksO=toLose/(bw*.007),wksP=toLose/(bw*.0035);out.push(`Tuk: z <b>${ME.bf} %</b> na <b>${ME.bfT} %</b> = zhodiť ~${r1(toLose)} kg tuku pri zachovaní svalov (cieľová váha ~${Math.round(target)} kg). Zdravé tempo 0,35–0,7 % váhy týždenne [28] → <b>${Math.ceil(wksO)}–${Math.ceil(wksP)} týždňov</b>. Rýchlejšie = strácaš aj svaly.`);}
  if(sc.sila+sc.skip===0)out.push('Zatiaľ nemáš za posledných 30 dní nič odfajknuté. Prvý krok je jednoduchý: v Tréningu potiahni kartu doľava po každom tréningu.');
  else{out.push(`Za 30 dní si dal <b>${sc.sila}</b> silových tréningov z ${sc.sila+sc.skip} plánovaných (${sc.cons} %)${sc.kardio?` a ${sc.kardio} kardio`:''}. ${sc.cons>=85?'Toto je konzistencia, ktorú väčšina ľudí vo fitku nikdy nedosiahne – presne ona robí výsledky, nie „dokonalý“ program.':sc.cons>=60?'Slušné. Cieľ je 4 silové týždenne – každý vynechaný tréning je asi 2 % rastu, ktoré nedobehneš.':'Tento mesiac bol slabší. Nič sa nestalo – svaly nezmiznú za týždeň, ale konzistencia je jediná vec, ktorá sa nedá nahradiť.'}`);}
@@ -1454,25 +1473,23 @@ function renderTrain(){
  const sec=$('tab-train');const wk=monday(today()),w=weekOf(D,wk);const list=blockList();
  const dots=BLOCKS.map(b=>{const v=w[b.k];return `<i class="${v?(v.s==='done'?'d':'s'):''}"></i>`;}).join('');
  sec.innerHTML=`
- <div class="tabtop"><h2>Tento týždeň</h2><span class="small mute">${fmtD(wk)} – ${fmtD(addDays(wk,6))}</span>${aiSyncBtn('train')}</div>
+ <div class="tabtop"><h2>Tento týždeň</h2><span class="small mute">${fmtD(wk)} – ${fmtD(addDays(wk,6))}</span></div>
  <div class="wkdots">${dots}</div>
- <div class="hint">← potiahni doľava = hotovo &nbsp;·&nbsp; doprava = vynechané → &nbsp;·&nbsp; ťuknutie = otvoriť</div>
+ <div class="hint">← doľava = hotovo · doprava = vynechané → · ťuk = otvoriť</div>
  <div id="swlist">${list.map(cardHTML).join('')}</div>
- <div class="row wrap" style="margin:4px 0 14px;gap:6px"><span class="small mute">Pridať navyše:</span><button class="btn sm" data-extra="sila">+ Sila</button><button class="btn sm" data-extra="HIIT">+ HIIT</button><button class="btn sm" data-extra="LISS">+ LISS</button><button class="btn sm" data-extra="MOB">+ Mobilita</button></div>
- <div class="card"><div class="row" style="margin-bottom:6px"><h2 class="grow">Program</h2><span class="chip tier">Nippard S</span><span class="chip love">❤️ milujeme</span></div>
-  <p class="small mute" style="margin:0 0 6px">Upper / Lower × 2 týždenne, každá séria do zlyhania, dropset na poslednej. Ťukni na cvik = technika. V otvorenom tréningu si vieš zmeniť poradie cvikov (↕).</p>
-  ${['WARM','UA','LA','UB','LB','HIIT','LISS','MOB','STRETCH','RULES'].map(k=>`<details class="acc"><summary><span class="ic" style="width:34px;height:34px;border-radius:10px;background:${SESSIONS[k].kind==='sila'?'var(--blue-s)':'var(--card2)'};color:${SESSIONS[k].kind==='sila'?'var(--blue)':'var(--mute)'};display:flex;align-items:center;justify-content:center;font:900 11px var(--disp)">${k==='STRETCH'?'STR':k==='RULES'?'?':k.slice(0,4)}</span><span class="grow">${SESSIONS[k].n}<br><span class="small mute" style="font-weight:500">${SESSIONS[k].sub}</span></span><span class="car">▸</span></summary><div class="body" data-sesbody="${k}">${sessionHTML(k)}</div></details>`).join('')}
+ <div class="row wrap" style="margin:4px 0 14px;gap:6px"><button class="btn sm" id="actNew">＋ Aktivita (HIIT, LISS, iné)</button><button class="btn sm" data-extra="sila">＋ Sila navyše</button></div>
+ <div class="card"><div class="row" style="margin-bottom:6px"><h2 class="grow">Program</h2></div>
+  <p class="small mute" style="margin:0 0 6px">Ťuk na cvik = technika. V tréningu ✏️ Upraviť = poradie, názvy, série, cviky.</p>
+  ${['WARM','UA','LA','UB','LB','HIIT','LISS','MOB','STRETCH','RULES'].map(k=>`<details class="acc"><summary><span class="ic" style="width:34px;height:34px;border-radius:10px;background:${SESSIONS[k].kind==='sila'?'var(--blue-s)':'var(--card2)'};color:${SESSIONS[k].kind==='sila'?'var(--blue)':'var(--mute)'};display:flex;align-items:center;justify-content:center;font:900 11px var(--disp)">${k==='STRETCH'?'STR':k==='RULES'?'?':k.slice(0,4)}</span><span class="grow">${SESSIONS[k].n}${D.plan&&Array.isArray(D.plan[k])?' <span class="badge ai">upravený</span>':''}<br><span class="small mute" style="font-weight:500">${SESSIONS[k].sub}</span></span><span class="car">▸</span></summary><div class="body" data-sesbody="${k}">${sessionHTML(k)}</div></details>`).join('')}
  </div>
- <div class="card"><div class="row"><h2 class="grow">Merania</h2><button class="btn pri sm" id="newLog">＋ Nové meranie</button></div>
-  <p class="small mute" style="margin:6px 0 8px">Zapíš celý tréning: váhy × opakovania, ľubovoľný počet sérií, dropset označ tlačidlom. Ukladá sa samo pri každom zápise.</p>
+ <div class="card"><div class="row"><h2 class="grow">História</h2><button class="btn pri sm" id="newLog">＋ Meranie</button></div>
   <div id="loglist">${histHTML()}</div>
  </div>`;
  sec.querySelectorAll('.sw').forEach(attachSwipe);
  sec.querySelectorAll('[data-extra]').forEach(b=>b.onclick=()=>addExtra(b.dataset.extra));
  bindSessionBody(sec);
- $('newLog').onclick=()=>openLog('UA');
- sec.querySelectorAll('[data-openlog]').forEach(b=>b.onclick=()=>openLog(b.dataset.openlog));
- bindSyncBtns(sec);
+ $('newLog').onclick=()=>openLog('UA');$('actNew').onclick=()=>openActivity(null);
+ bindHist(sec);
 }
 function cardHTML(b){
  const v=weekOf(D,monday(today()))[b.k];const st=v?v.s:'';
@@ -1518,27 +1535,30 @@ function addExtra(kind){
 }
 /* ---------- program: poradie cvikov na profil ---------- */
 function sessionExercises(k){
- const s=SESSIONS[k];if(!s||!s.ex)return [];const core=s.core?(ME.dia?s.core.dia:s.core.std):[];
- let list=[...s.ex,...core];const order=(D.plan&&D.plan.order&&D.plan.order[k])||null;
+ const s=SESSIONS[k];if(!s||!s.ex)return [];
+ const ov=D.plan&&Array.isArray(D.plan[k])?D.plan[k]:null;
+ if(ov)return ov.map(x=>Object.assign({},x));
+ const core=s.core?(ME.dia?s.core.dia:s.core.std):[];
+ let list=[...s.ex,...core].map(x=>Object.assign({},x));const order=(D.plan&&D.plan.order&&D.plan.order[k])||null;
  if(order){const byId={};list.forEach(x=>byId[x.id]=x);const out=[];order.forEach(id=>{if(byId[id]){out.push(byId[id]);delete byId[id];}});Object.values(byId).forEach(x=>out.push(x));list=out;}
  return list;
 }
 function exRowHTML(x,i){
- const e=EX[x.id];const tags=[];if(e.love)tags.push('<span class="chip love">❤️</span>');else if(e.ok)tags.push('<span class="chip ok">ok</span>');if(e.tier)tags.push(`<span class="chip tier">Nippard ${e.tier}</span>`);if(e.dia)tags.push('<span class="chip dia">diastáza-safe</span>');if(x.drop)tags.push('<span class="chip">↓ dropset</span>');
- const h=exHistory(D,x.id);let lastTxt='';
- if(h.length){const L=h[h.length-1];const top=parseInt((String(x.sets).match(/[–-]\s*(\d+)/)||[])[1]||0);const lower=['hack','lp','le','slc','ht','calf','abd','add','hyp'].includes(x.id);const hint=L.e1>0?(top&&L.r>=top?` → nabudúce +${lower?5:2.5} kg`:top?` → cieľ ${top} opak.`:''):'';lastTxt=`<div class="lastline">naposledy ${L.w?L.w+' kg × ':''}${L.r}${e.u==='s'?' s':e.u==='m'?' m':''} (${fmtD(L.d)})${hint}</div>`;}
- return `<div class="exrow" data-key="${x.id}" data-label="${esc(e.n)}"><div class="num${x.ss?' ss':''}">${x.ss?x.ss:i}</div><div class="grow"><div class="row" style="align-items:flex-start"><div class="nm grow">${esc(e.n)}</div><div class="sets">${esc(x.sets)}</div></div><div class="small mute">${esc(e.m)}${x.ss?` · <span class="ssnote">superset ${x.ss}</span>`:''}</div>${lastTxt}<div class="cue">${esc(e.cue)}${e.setup?' <i>'+esc(e.setup)+'</i>':''}</div><div class="tags">${tags.join('')}</div></div><span class="grip" data-grip hidden>☰</span></div>`;
+ const e=EX[x.id]||{n:x.nm||x.id,m:'vlastný cvik',cue:''};const name=x.nm||e.n;const tags=[];if(e.love)tags.push('<span class="chip love">❤️ milujeme</span>');if(e.tier)tags.push(`<span class="chip tier">Nippard ${e.tier}</span>`);if(e.dia)tags.push('<span class="chip dia">diastáza-safe</span>');
+ const h=EX[x.id]?exHistory(D,x.id):[];let lastTxt='';
+ if(h.length){const L=h[h.length-1];const top=parseInt((String(x.sets).match(/[–-]\s*(\d+)/)||[])[1]||0);const lower=['hack','lp','le','slc','ht','calf','abd','add','hyp'].includes(x.id);const hint=L.e1>0?(top&&L.r>=top?` → skús +${lower?5:2.5} kg`:top?` → cieľ ${top} opak.`:''):'';lastTxt=`<div class="lastline">naposledy ${L.w?L.w+' kg × ':''}${L.r}${e.u==='s'?' s':e.u==='m'?' m':''} (${fmtD(L.d)})${hint}</div>`;}
+ const nx=claudeNext(x.id);if(nx&&(nx.w||nx.r))lastTxt+=`<div class="lastline" style="color:var(--violet)">✦ Claude: ${nx.w?nx.w+' kg × ':''}${esc(nx.r)}${nx.note?' · '+esc(nx.note):''}</div>`;
+ return `<div class="exrow" data-key="${x.k||x.id}" data-label="${esc(name)}"><div class="num${x.ss?' ss':''}">${x.ss?x.ss:i}</div><div class="grow"><div class="row" style="align-items:flex-start"><div class="nm grow">${esc(name)}</div><div class="sets">${esc(x.sets)}${x.drop?' ↓':''}</div></div><div class="small mute">${esc(e.m)}${x.ss?` · <span class="ssnote">superset ${x.ss}</span>`:''}</div>${lastTxt}<div class="cue">${esc(e.cue||'')}${e.setup?' <i>'+esc(e.setup)+'</i>':''}${tags.length?'<div class="tags">'+tags.join('')+'</div>':''}</div></div></div>`;
 }
 function sessionHTML(k){
  const s=SESSIONS[k];
  if(s.kind!=='sila')return `<ol style="margin:0;padding-left:20px;font-size:14px">${s.items.map(x=>`<li style="margin:5px 0">${x.replace(/\[(\d+)\]/g,'<sup class="src">[$1]</sup>')}</li>`).join('')}</ol>${s.why?`<p class="small mute" style="margin:10px 0 0">${s.why.replace(/\[(\d+)\]/g,'<sup class="src">[$1]</sup>')}</p>`:''}`;
- let i=0;const list=sessionExercises(k);const rows=list.map(x=>exRowHTML(x,++i)).join('');
- const dia=!!ME.dia;
- return `<div class="row" style="margin-bottom:4px"><div class="small mute grow">⏱ ${s.min}</div><button class="btn ghost sm" data-order="${k}">↕ Poradie</button></div><div class="exlist" data-exlist="${k}">${rows}</div><p class="tiny mute" style="margin:6px 0 0">${dia?'Stred tela: verzia pre diastázu – bez skracovačiek a plankov, ktoré tlačia brucho von. Ak sa objaví „kopček“ v strede brucha, zmenši rozsah [24].':'Cable crunch ide zaťažovať ako každý iný sval – preto brucho reálne rastie.'}</p>${s.after?`<div class="banner" style="margin:12px 0 0">${s.after}</div>`:''}<div style="margin-top:12px"><button class="btn wide" data-openlog="${k}">📝 Zapísať meranie – ${s.n}</button></div>`;
+ let i=0;const list=sessionExercises(k);const rows=list.map(x=>exRowHTML(x,++i)).join('');const custom=D.plan&&Array.isArray(D.plan[k]);
+ return `<div class="row" style="margin-bottom:4px"><div class="small mute grow">⏱ ${s.min}${custom?' · <span style="color:var(--violet)">upravený plán</span>':''}</div><button class="btn ghost sm" data-editplan="${k}">✏️ Upraviť</button></div><div class="exlist" data-exlist="${k}">${rows}</div>${s.after?`<div class="banner" style="margin:12px 0 0">${s.after}</div>`:''}<div style="margin-top:12px"><button class="btn pri wide" data-openlog="${k}">📝 Zapísať meranie</button></div>`;
 }
 function bindSessionBody(root){
- root.querySelectorAll('.exrow').forEach(r=>r.addEventListener('click',e=>{if(!e.target.closest('button')&&!e.target.closest('[data-grip]'))r.classList.toggle('open');}));
- root.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>{const k=b.dataset.order;const list=root.querySelector(`[data-exlist="${k}"]`);const on=list.classList.toggle('ordering');list.querySelectorAll('[data-grip]').forEach(g=>g.hidden=!on);b.textContent=on?'✓ Hotovo':'↕ Poradie';if(on)makeSortable(list,'.exrow','[data-grip]',ids=>{D.plan.order=D.plan.order||{};D.plan.order[k]=ids;save();});});
+ root.querySelectorAll('.exrow').forEach(r=>r.addEventListener('click',e=>{if(!e.target.closest('button'))r.classList.toggle('open');}));
+ root.querySelectorAll('[data-editplan]').forEach(b=>b.onclick=()=>openPlanEditor(b.dataset.editplan));
  root.querySelectorAll('[data-openlog]').forEach(x=>x.onclick=()=>{closeSheet('shSession');openLog(x.dataset.openlog);});
 }
 function openSession(k){
@@ -1560,18 +1580,74 @@ function makeSortable(container,itemSel,handleSel,onReorder){
  const end=()=>{if(!dragEl)return;dragEl.classList.remove('dragging');dragEl=null;if(ghost)ghost.remove();ghost=null;onReorder([...container.querySelectorAll(itemSel)].map(x=>x.dataset.key));};
  container.addEventListener('pointerup',end);container.addEventListener('pointercancel',end);
 }
+
+/* ---------- úprava tréningu (poradie, názvy, série, cviky) ---------- */
+let PLAN=null;
+function openPlanEditor(k){
+ PLAN={k,list:sessionExercises(k).map(x=>({id:x.id,nm:x.nm||'',sets:String(x.sets||''),drop:x.drop?1:0,ss:x.ss||'',k:x.k||uid()}))};
+ $('formTitle').textContent='Upraviť · '+SESSIONS[k].n;renderPlanEditor();openSheet('shForm');
+}
+function renderPlanEditor(){
+ const k=PLAN.k;const others=PROFILES.filter(p=>p.id!==ME.id&&OTHERS[p.id]&&OTHERS[p.id].plan&&Array.isArray(OTHERS[p.id].plan[k]));
+ $('formBody').innerHTML=`<p class="tiny mute" style="margin:0 0 8px">☰ presuň · názov a série prepíš · DROP = dropset na poslednej sérii · ✕ odstráni. Zmeny platia len pre tvoj profil.</p>
+ <div id="planItems">${PLAN.list.map(x=>{const e=EX[x.id];return `<div class="lex" data-key="${x.k}" data-label="${esc(x.nm||(e?e.n:x.id))}"><div class="hd"><span class="grip" data-grip>☰</span><input class="nm" data-pnm value="${esc(x.nm||(e?e.n:''))}" placeholder="názov cviku"><button class="rm" data-prm>✕</button></div><div class="row" style="gap:6px;padding-left:42px;margin-top:4px"><input data-psets value="${esc(x.sets)}" placeholder="3 × 8–12" style="padding:7px 9px;font-size:14px;border-radius:9px"><button class="drop" data-pdrop aria-pressed="${x.drop?'true':'false'}" style="height:38px;border:1.5px solid var(--line2);background:var(--bg2);color:var(--mute);border-radius:8px;padding:0 8px;font:800 11px var(--disp);min-width:52px">DROP</button></div></div>`;}).join('')}</div>
+ <select id="planAdd" style="margin-top:8px"><option value="">＋ Pridať cvik…</option>${Object.entries(EX).map(([id,e])=>`<option value="${id}">${esc(e.n)}</option>`).join('')}<option value="__custom">✏️ Vlastný cvik</option></select>
+ <div class="row" style="gap:8px;margin-top:12px"><button class="btn pri grow" id="planSave">Uložiť plán</button><button class="btn" id="planReset">Pôvodný</button></div>
+ ${others.map(p=>`<button class="btn wide" style="margin-top:8px" data-plancopy="${p.id}">Prevziať plán od ${esc(p.name)}</button>`).join('')}`;
+ const root=$('planItems');
+ root.querySelectorAll('.lex').forEach(el=>{const x=PLAN.list.find(i=>i.k===el.dataset.key);if(!x)return;
+  el.querySelector('[data-pnm]').oninput=e=>{x.nm=e.target.value;if(EX[x.id]&&x.nm.trim()===EX[x.id].n)x.nm='';};
+  el.querySelector('[data-psets]').oninput=e=>{x.sets=e.target.value;};
+  el.querySelector('[data-pdrop]').onclick=e=>{x.drop=x.drop?0:1;e.target.setAttribute('aria-pressed',x.drop?'true':'false');e.target.style.color=x.drop?'var(--rose)':'var(--mute)';e.target.style.borderColor=x.drop?'var(--rose)':'var(--line2)';};
+  const dp=el.querySelector('[data-pdrop]');if(x.drop){dp.style.color='var(--rose)';dp.style.borderColor='var(--rose)';}
+  el.querySelector('[data-prm]').onclick=()=>{PLAN.list=PLAN.list.filter(i=>i!==x);renderPlanEditor();};});
+ makeSortable(root,'.lex','[data-grip]',keys=>{const by={};PLAN.list.forEach(i=>by[i.k]=i);PLAN.list=keys.map(q=>by[q]).filter(Boolean);});
+ $('planAdd').onchange=e=>{const v=e.target.value;if(!v)return;PLAN.list.push(v==='__custom'?{id:'c:'+uid().slice(0,6),nm:'Nový cvik',sets:'2 × 8–12',drop:0,ss:'',k:uid()}:{id:v,nm:'',sets:'2 × 8–12',drop:0,ss:'',k:uid()});renderPlanEditor();};
+ $('planSave').onclick=()=>{D.plan[k]=PLAN.list.map(x=>({id:x.id,nm:x.nm,sets:x.sets||'2 × 8–12',drop:x.drop?1:0,ss:x.ss||'',k:x.k}));if(D.plan.order)delete D.plan.order[k];save();closeSheet('shForm');afterPlanChange(k);toast('Plán uložený ✔');};
+ $('planReset').onclick=async()=>{if(await ask('Vrátiť pôvodný plán tohto tréningu?',{ok:'Vrátiť'})){delete D.plan[k];if(D.plan.order)delete D.plan.order[k];save();closeSheet('shForm');afterPlanChange(k);}};
+ root.parentElement.querySelectorAll('[data-plancopy]').forEach(b=>b.onclick=()=>{const src=OTHERS[b.dataset.plancopy].plan[k];D.plan[k]=JSON.parse(JSON.stringify(src)).map(x=>Object.assign(x,{k:uid()}));save();closeSheet('shForm');afterPlanChange(k);toast('Plán prevzatý ✔');});
+}
+function afterPlanChange(k){if(curTab==='train')renderTrain();if($('shSession').classList.contains('on')){$('sesBody').innerHTML=sessionHTML(k);bindSessionBody($('sesBody'));}}
+/* ---------- aktivity: HIIT / LISS / mobilita / čokoľvek ---------- */
+const ACT_KINDS=[['HIIT','HIIT'],['LISS','LISS (LIIT)'],['MOB','Mobilita / strečing'],['OTHER','Iné (futbal, túra…)']];
+function openActivity(id){
+ const a=id?D.acts.find(x=>x.id===id):{id:uid(),d:today(),kind:'HIIT',name:'',min:15,int:'mid',note:''};if(!a)return;
+ $('formTitle').textContent=id?'Aktivita':'Nová aktivita';
+ $('formBody').innerHTML=`<label class="lbl">Typ</label><div class="seg" id="actKind">${ACT_KINDS.map(([v,l])=>`<button data-v="${v}" aria-pressed="${a.kind===v}">${l.split(' ')[0]}</button>`).join('')}</div>
+ <div id="actNameWrap" ${a.kind==='OTHER'?'':'hidden'}><label class="lbl">Čo to bolo</label><input id="actName" value="${esc(a.name||'')}" placeholder="napr. futbal, túra, plávanie"></div>
+ <div class="fieldrow"><div><label class="lbl">Dátum</label><input type="date" id="actDate" value="${a.d}"></div><div><label class="lbl">Minúty</label><input type="number" inputmode="numeric" id="actMin" value="${a.min||''}"></div></div>
+ <label class="lbl">Intenzita</label><div class="seg" id="actInt"><button data-v="low" aria-pressed="${a.int==='low'}">Ľahká</button><button data-v="mid" aria-pressed="${a.int==='mid'}">Stredná</button><button data-v="max" aria-pressed="${a.int==='max'}">Naplno</button></div>
+ <label class="lbl">Poznámka</label><input id="actNote" value="${esc(a.note||'')}" placeholder="pás 8 %, 10×30/60…">
+ <div class="row" style="gap:8px;margin-top:14px"><button class="btn pri grow" id="actSave">Uložiť</button>${id?'<button class="btn danger" id="actDel">🗑️</button>':''}</div>`;
+ $('actKind').addEventListener('seg',e=>{$('actNameWrap').hidden=e.detail!=='OTHER';});
+ $('actSave').onclick=()=>{a.kind=getSeg('actKind')||'HIIT';a.name=a.kind==='OTHER'?$('actName').value.trim():'';a.d=$('actDate').value||today();a.min=parseInt($('actMin').value)||0;a.int=getSeg('actInt')||'mid';a.note=$('actNote').value.trim();a.u=Date.now();if(!D.acts.find(x=>x.id===a.id)){D.acts.push(a);markCardio(a);}save();closeSheet('shForm');renderTrain();renderHeader();buzz([10,30,10]);toast('Aktivita uložená ✔');};
+ const del=$('actDel');if(del)del.onclick=async()=>{if(await ask('Zmazať túto aktivitu?',{ok:'Zmazať',danger:true})){D.acts=D.acts.filter(x=>x.id!==a.id);save();closeSheet('shForm');renderTrain();}};
+ openSheet('shForm');
+}
+function markCardio(a){
+ const wk=monday(a.d);D.checks[wk]=D.checks[wk]||{};const w=D.checks[wk];
+ const slots=a.kind==='HIIT'?['H1','H2']:a.kind==='LISS'?['L1','L2']:[];
+ const free=slots.find(k=>!w[k]);
+ if(free)w[free]={s:'done',d:a.d,t:'kardio',ses:a.kind,min:a.min,act:a.id};
+ else{const k='X'+uid().slice(0,5);w[k]={n:a.kind==='OTHER'?(a.name||'Aktivita'):a.kind==='MOB'?'Mobilita':a.kind+' navyše',sub:(a.min?a.min+' min':''),t:'kardio',ses:a.kind==='OTHER'?'':a.kind,s:'done',d:a.d,min:a.min,act:a.id};}
+}
+async function moveLog(log,toId){
+ const target=normData(await S.get(K.data(toId)));if(target.logs.find(x=>x.id===log.id))throw new Error('už tam je');
+ target.logs.push(JSON.parse(JSON.stringify(log)));target.u=Date.now();LS.set(K.data(toId),target);const ok=await S.set(K.data(toId),target);if(!ok)throw new Error('zápis na server zlyhal');
+ D.logs=D.logs.filter(x=>x.id!==log.id);save();if(OTHERS[toId])OTHERS[toId]=target;
+}
 /* ---------- merania: editor s autosave ---------- */
 let LOG=null,logSaveT=null;
 function newLogFor(ses,date){
  const last=(D.logs||[]).filter(x=>x.session===ses&&x.id!==(LOG&&LOG.id)).sort((a,b)=>a.date<b.date?1:-1)[0];
- const items=sessionExercises(ses).map(x=>{const prev=last?(last.items||[]).find(i=>i.id===x.id):null;const sets=prev&&validSets(prev).length?prev.sets.map(s=>({w:+s.w||0,r:+s.r||0,d:s.d?1:0})):[{w:0,r:0,d:0},{w:0,r:0,d:0}];return {id:x.id,nm:'',sets};});
+ const items=sessionExercises(ses).map(x=>{const prev=last?(last.items||[]).find(i=>i.id===x.id):null;const sets=prev&&validSets(prev).length?prev.sets.map(s=>({w:+s.w||0,r:+s.r||0,d:s.d?1:0})):[{w:0,r:0,d:0},{w:0,r:0,d:0}];return {id:x.id,nm:x.nm||'',sets,k:uid()};});
  return {id:uid(),date,session:ses,note:'',items,u:0};
 }
 function openLog(sesOrId){
- let l=null,ses='UA';
+ let l=null,ses='UA';if(D.logs.length===0&&!(sesOrId&&SESSIONS[sesOrId]))sesOrId=sesOrId||'UA';
  if(sesOrId&&SESSIONS[sesOrId]&&SESSIONS[sesOrId].ex){ses=sesOrId;l=(D.logs||[]).find(x=>x.session===ses&&x.date===today())||null;}
  else if(sesOrId){l=(D.logs||[]).find(x=>x.id===sesOrId)||null;if(l)ses=l.session;}
- LOG=l?migrateLog(l):newLogFor(ses,today());
+ LOG=l?migrateLog(l):newLogFor(ses,today());(LOG.items||[]).forEach(it=>it.k=it.k||uid());
  renderLogEditor();openSheet('shLog');
 }
 function logHasContent(){return (LOG.items||[]).some(it=>validSets(it).length)||!!(LOG.note&&LOG.note.trim());}
@@ -1582,7 +1658,7 @@ function logFlush(){
   if(logHasContent()){LOG.u=Date.now();if(idx<0)D.logs.push(LOG);else D.logs[idx]=LOG;}
   else if(idx>=0)D.logs.splice(idx,1);
   save();st.textContent='uložené ✓';st.className='savestate ok';
-  const ll=$('loglist');if(ll)ll.innerHTML=histHTML();$('tab-train').querySelectorAll('[data-openlog]').forEach(b=>b.onclick=()=>openLog(b.dataset.openlog));
+  const ll=$('loglist');if(ll){ll.innerHTML=histHTML();bindHist(ll);}
  },400);
 }
 function renderLogEditor(){
@@ -1593,25 +1669,26 @@ function renderLogEditor(){
  <div id="logItems">${LOG.items.map(logItemHTML).join('')}</div>
  <div class="row" style="gap:8px;margin-top:10px"><select id="logAddSel" class="grow"><option value="">＋ Pridať cvik…</option>${Object.entries(EX).map(([id,e])=>`<option value="${id}">${esc(e.n)}</option>`).join('')}<option value="__custom">✏️ Vlastný názov cviku</option></select></div>
  <label class="lbl">Poznámka</label><input id="logNote" placeholder="napr. slabý spánok, nový stroj…" value="${esc(LOG.note||'')}">
- <div class="row" style="margin-top:12px;gap:8px"><button class="btn pri grow" id="logDone">Hotovo</button>${exists?'<button class="btn danger" id="logDel">🗑️ Zmazať</button>':''}</div>`;
+ <div class="row" style="margin-top:12px;gap:8px"><button class="btn pri grow" id="logDone">Hotovo</button>${exists?'<button class="btn danger" id="logDel">🗑️</button>':''}</div>${exists&&PROFILES.length>1&&S.mode!=='local'?`<div class="row" style="gap:8px;margin-top:8px"><select id="logMove" class="grow"><option value="">Presunúť meranie do profilu…</option>${PROFILES.filter(p=>p.id!==ME.id).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}`;
  $('logDate').onchange=e=>{LOG.date=e.target.value||today();logFlush();};
  $('logSes').onchange=e=>{const k=e.target.value;if(logHasContent()){LOG.session=k;logFlush();renderLogEditor();}else{LOG=newLogFor(k,LOG.date);renderLogEditor();}};
  $('logNote').oninput=e=>{LOG.note=e.target.value;logFlush();};
- $('logAddSel').onchange=e=>{const v=e.target.value;if(!v)return;if(v==='__custom'){LOG.items.push({id:'c:'+uid().slice(0,6),nm:'Nový cvik',sets:[{w:0,r:0,d:0},{w:0,r:0,d:0}]});}else LOG.items.push({id:v,nm:'',sets:[{w:0,r:0,d:0},{w:0,r:0,d:0}]});e.target.value='';renderLogEditor();const rows=$('logItems').children;const last=rows[rows.length-1];if(last){last.scrollIntoView({behavior:'smooth',block:'center'});const nm=last.querySelector('input.nm');if(v==='__custom'&&nm){nm.focus();nm.select();}}};
+ $('logAddSel').onchange=e=>{const v=e.target.value;if(!v)return;if(v==='__custom'){LOG.items.push({id:'c:'+uid().slice(0,6),nm:'Nový cvik',sets:[{w:0,r:0,d:0},{w:0,r:0,d:0}],k:uid()});}else LOG.items.push({id:v,nm:'',sets:[{w:0,r:0,d:0},{w:0,r:0,d:0}],k:uid()});e.target.value='';renderLogEditor();const rows=$('logItems').children;const last=rows[rows.length-1];if(last){last.scrollIntoView({behavior:'smooth',block:'center'});const nm=last.querySelector('input.nm');if(v==='__custom'&&nm){nm.focus();nm.select();}}};
  $('logDone').onclick=()=>{clearTimeout(logSaveT);logFlushNow();closeSheet('shLog');renderTrain();if(logHasContent()){buzz([10,30,10]);toast('Meranie uložené – pozri Domov › Sila 📈');}};
  const del=$('logDel');if(del)del.onclick=async()=>{if(await ask('Zmazať toto meranie?',{ok:'Zmazať',danger:true})){D.logs=D.logs.filter(x=>x.id!==LOG.id);save();closeSheet('shLog');renderTrain();toast('Zmazané');}};
+ const mv=$('logMove');if(mv)mv.onchange=async e=>{const to=e.target.value;if(!to)return;const p=PROFILES.find(x=>x.id===to);if(await ask(`Presunúť toto meranie do profilu <b>${esc(p.name)}</b>? U teba zmizne.`,{ok:'Presunúť'})){try{clearTimeout(logSaveT);logFlushNow();await moveLog(LOG,to);closeSheet('shLog');renderTrain();toast('Presunuté do '+p.name+' ✔');}catch(err){toast('Presun zlyhal: '+(err.message||err),3000);}}else e.target.value='';};
  bindLogItems();
- makeSortable($('logItems'),'.lex','[data-grip]',keys=>{const by={};LOG.items.forEach(it=>by[it.id]=it);LOG.items=keys.map(k=>by[k]).filter(Boolean);logFlush();});
+ makeSortable($('logItems'),'.lex','[data-grip]',keys=>{const by={};LOG.items.forEach(it=>by[it.k]=it);LOG.items=keys.map(k=>by[k]).filter(Boolean);logFlush();});
 }
 function logFlushNow(){const idx=D.logs.findIndex(x=>x.id===LOG.id);if(logHasContent()){LOG.u=Date.now();if(idx<0)D.logs.push(LOG);else D.logs[idx]=LOG;}else if(idx>=0)D.logs.splice(idx,1);save();}
 function logItemHTML(it){
- const e=EX[it.id];const unit=e&&e.u==='s'?'s':e&&e.u==='m'?'m':'op.';const h=e?exHistory(D,it.id).filter(x=>x.d<LOG.date):[];const L=h.length?h[h.length-1]:null;
- return `<div class="lex" data-key="${it.id}" data-label="${esc(exName(it))}"><div class="hd"><span class="grip" data-grip>☰</span><input class="nm" value="${esc(exName(it))}" data-nm placeholder="názov cviku"><button class="rm" data-rmex aria-label="Odstrániť cvik">✕</button></div>${e?`<div class="tiny mute" style="padding-left:42px">${esc(e.m)}${L?` · naposledy ${L.w?L.w+' kg × ':''}${L.r} (${fmtD(L.d)})`:''}</div>`:''}<div class="sets">${it.sets.map((s,i)=>`<div class="setrow${s.d?' d':''}" data-i="${i}"><span class="idx">${i+1}</span><input type="number" inputmode="decimal" placeholder="kg" data-w value="${s.w||''}"><span class="x">×</span><input type="number" inputmode="numeric" placeholder="${unit}" data-r value="${s.r||''}"><button class="drop" data-drop aria-pressed="${s.d?'true':'false'}">DROP</button><button class="del" data-delset aria-label="Zmazať sériu">✕</button></div>`).join('')}</div><button class="addset" data-addset>＋ séria</button></div>`;
+ const e=EX[it.id];const unit=e&&e.u==='s'?'s':e&&e.u==='m'?'m':'op.';const h=e?exHistory(D,it.id).filter(x=>x.d<LOG.date):[];const L=h.length?h[h.length-1]:null;const nx=e?claudeNext(it.id):null;
+ return `<div class="lex" data-key="${it.k}" data-label="${esc(exName(it))}"><div class="hd"><span class="grip" data-grip>☰</span><input class="nm" value="${esc(exName(it))}" data-nm placeholder="názov cviku"><button class="rm" data-rmex aria-label="Odstrániť cvik">✕</button></div>${(L||nx)?`<div class="tiny" style="padding-left:42px;color:var(--mint)">${L?`naposledy ${L.w?L.w+' kg × ':''}${L.r} (${fmtD(L.d)})`:''}${nx&&(nx.w||nx.r)?`${L?' · ':''}<span style="color:var(--violet)">✦ ${nx.w?nx.w+' kg × ':''}${esc(nx.r)}</span>`:''}</div>`:''}<div class="sets">${it.sets.map((s,i)=>`<div class="setrow${s.d?' d':''}" data-i="${i}"><span class="idx">${i+1}</span><input type="number" inputmode="decimal" placeholder="kg" data-w value="${s.w||''}"><span class="x">×</span><input type="number" inputmode="numeric" placeholder="${unit}" data-r value="${s.r||''}"><button class="drop" data-drop aria-pressed="${s.d?'true':'false'}">DROP</button><button class="del" data-delset aria-label="Zmazať sériu">✕</button></div>`).join('')}</div><button class="addset" data-addset>＋ séria</button></div>`;
 }
 function bindLogItems(){
  const root=$('logItems');
  root.querySelectorAll('.lex').forEach(el=>{
-  const it=LOG.items.find(x=>x.id===el.dataset.key);if(!it)return;
+  const it=LOG.items.find(x=>x.k===el.dataset.key);if(!it)return;
   el.querySelector('[data-nm]').oninput=e=>{it.nm=e.target.value;if(EX[it.id]&&it.nm.trim()===EX[it.id].n)it.nm='';logFlush();};
   el.querySelector('[data-rmex]').onclick=async()=>{if(validSets(it).length&&!(await ask(`Odstrániť <b>${esc(exName(it))}</b> z tohto merania?`,{ok:'Odstrániť',danger:true})))return;LOG.items=LOG.items.filter(x=>x!==it);logFlush();renderLogEditor();};
   el.querySelectorAll('.setrow').forEach(row=>{const i=+row.dataset.i;const s=it.sets[i];
@@ -1620,14 +1697,16 @@ function bindLogItems(){
    row.querySelector('[data-drop]').onclick=e=>{s.d=s.d?0:1;e.target.setAttribute('aria-pressed',s.d?'true':'false');row.classList.toggle('d',!!s.d);buzz(6);logFlush();};
    row.querySelector('[data-delset]').onclick=()=>{if(it.sets.length<=1){it.sets[0]={w:0,r:0,d:0};}else it.sets.splice(i,1);logFlush();renderLogEditor();};
   });
-  el.querySelector('[data-addset]').onclick=()=>{const last=it.sets[it.sets.length-1]||{w:0,r:0};it.sets.push({w:+last.w||0,r:0,d:0});renderLogEditor();const rows=root.querySelector(`.lex[data-key="${it.id}"]`).querySelectorAll('.setrow');const r=rows[rows.length-1].querySelector('[data-r]');if(r)r.focus();};
+  el.querySelector('[data-addset]').onclick=()=>{const last=it.sets[it.sets.length-1]||{w:0,r:0};it.sets.push({w:+last.w||0,r:0,d:0});renderLogEditor();const rows=root.querySelector(`.lex[data-key="${it.k}"]`).querySelectorAll('.setrow');const r=rows[rows.length-1].querySelector('[data-r]');if(r)r.focus();};
  });
 }
 function histHTML(){
- const logs=(D.logs||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
- if(!logs.length)return '<div class="empty">Zatiaľ žiadne meranie. Prvé bude tvoj štart – od neho sa počíta % zlepšenia.</div>';
- return logs.map(l=>{const ton=logTonnage(l);const n=(l.items||[]).filter(it=>validSets(it).length).length;const prs=recentPRs(D,400).filter(p=>p.d===l.date).length;return `<div class="hist"><div class="ic" style="width:40px;height:40px;border-radius:12px;background:var(--blue-s);color:var(--blue);display:flex;align-items:center;justify-content:center;font:900 12px var(--disp)">${l.session}</div><div class="grow"><b>${SESSIONS[l.session]?SESSIONS[l.session].n:l.session}</b> · ${fmtDY(l.date)}<div class="small mute">${n} cvikov · ${(ton/1000).toFixed(1)} t${prs?' · 🏆 '+prs+' PR':''}${l.note?' · '+esc(l.note):''}</div></div><button class="btn ghost sm" data-openlog="${l.id}">✏️</button></div>`;}).join('');
+ const rows=[...(D.logs||[]).map(l=>({t:'log',d:l.date,o:l})),...(D.acts||[]).map(a=>({t:'act',d:a.d,o:a}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
+ if(!rows.length)return '<div class="empty">Zatiaľ nič. Prvé meranie je tvoj štart – od neho sa počíta zlepšenie.</div>';
+ return rows.map(r=>{if(r.t==='act'){const a=r.o;const kn=a.kind==='OTHER'?(a.name||'Aktivita'):a.kind==='MOB'?'Mobilita':a.kind;return `<div class="hist" data-openact="${a.id}" style="cursor:pointer"><div class="ic" style="width:40px;height:40px;border-radius:12px;background:var(--amber-s);color:var(--amber);display:flex;align-items:center;justify-content:center;font:900 11px var(--disp)">${a.kind==='OTHER'?'•':a.kind==='MOB'?'MOB':a.kind}</div><div class="grow"><b>${esc(kn)}</b> · ${fmtDY(a.d)}<div class="small mute">${a.min?a.min+' min · ':''}${{low:'ľahká',mid:'stredná',max:'naplno'}[a.int]||''}${a.note?' · '+esc(a.note):''}</div></div></div>`;}
+  const l=r.o;const ton=logTonnage(l);const n=(l.items||[]).filter(it=>validSets(it).length).length;return `<div class="hist" data-openlog="${l.id}" style="cursor:pointer"><div class="ic" style="width:40px;height:40px;border-radius:12px;background:var(--blue-s);color:var(--blue);display:flex;align-items:center;justify-content:center;font:900 12px var(--disp)">${l.session}</div><div class="grow"><b>${SESSIONS[l.session]?SESSIONS[l.session].n:l.session}</b> · ${fmtDY(l.date)}<div class="small mute">${n} cvikov · ${(ton/1000).toFixed(1)} t${l.note?' · '+esc(l.note):''}</div></div><span class="mute">›</span></div>`;}).join('');
 }
+function bindHist(root){root.querySelectorAll('[data-openlog]').forEach(b=>b.onclick=()=>openLog(b.dataset.openlog));root.querySelectorAll('[data-openact]').forEach(b=>b.onclick=()=>openActivity(b.dataset.openact));}
 
 /* =====================================================================
    FOTKY JEDLA (IndexedDB – ostávajú v tomto zariadení)
@@ -1639,10 +1718,71 @@ function idbPut(o){return new Promise(res=>{if(!idb)return res(false);try{const 
 function idbDel(id){return new Promise(res=>{if(!idb)return res(false);try{const tx=idb.transaction('p','readwrite').objectStore('p').delete(id);tx.onsuccess=()=>res(true);tx.onerror=()=>res(false);}catch(e){res(false);}});}
 function thumbOf(dataUrl,size=96){return new Promise(res=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=size;c.height=size;const x=c.getContext('2d');const k=Math.max(size/img.width,size/img.height);const w=img.width*k,h=img.height*k;x.drawImage(img,(size-w)/2,(size-h)/2,w,h);res(c.toDataURL('image/jpeg',.6));};img.onerror=()=>res('');img.src=dataUrl;});}
 
+
+/* =====================================================================
+   POTRAVINY NA 100 g – rýchly odhad z popisu bez AI (kcal, B, S, T, vláknina, živiny, bežná porcia g)
+   ===================================================================== */
+const F=(syn,kcal,p,c,f,fi,nu,def,sp)=>({syn:syn.split('|'),kcal,p,c,f,fi,nu,def,sp});
+const FOOD100=[
+ F('vloc|ovos|ovsen|oat|kasa',370,13,60,7,10,['Carb','F','Mg','Fe','Zn'],60),
+ F('ryz+sur|ryz+such',355,8,78,1,1.5,['Carb'],80),F('ryz',130,2.7,28,0.3,0.4,['Carb'],200),
+ F('zemiak',80,2,17,0.1,1.8,['Carb','K','C'],250),F('batat|sladk+zemiak',86,1.6,20,0.1,3,['Carb','A','K','F'],200),
+ F('cestovin+such|spaget+such|cestovin+sur',350,13,70,2,3,['Carb'],80),F('cestovin|spaget|penne|fusil|makaron',150,5.5,30,1,2,['Carb'],200),
+ F('chlieb|chleb|krajec',240,9,40,3,7,['Carb','F'],45),F('zeml|rozok|pecivo',270,9,52,2,2,['Carb'],60),F('tortill|wrap',300,8,50,7,3,['Carb'],45),F('pita',270,9,55,1,2,['Carb'],70),
+ F('bulgur|kuskus|pohank|quino',350,12,68,2,8,['Carb','F','Mg'],60),F('ryzov+chleb|ryzov+chlebik',390,8,80,3,3,['Carb'],20),F('musli|granol',380,11,60,10,8,['Carb','F'],50),
+ F('kurac+prs|kurac+prsi|kura|kurac',165,31,0,3.6,0,['P','B12'],150),F('kurac+stehn|stehn',180,24,0,9,0,['P','B12','Zn'],150),F('morc',120,27,0,1,0,['P','B12','Zn'],150),
+ F('hovadz|hovaz|mlet+hovadz',250,26,0,17,0,['P','Fe','Zn','B12'],150),F('bravc',250,25,0,17,0,['P','B12','Zn'],150),F('mlet',230,22,0,16,0,['P','Fe','Zn','B12'],150),
+ F('losos',200,22,0,13,0,['P','O','D','B12'],150),F('tuniak|tunak',110,25,0,1,0,['P','B12','I'],80),F('sardin',210,24,0,12,0,['P','O','Ca','D','B12','I'],100),F('makrel',300,19,0,25,0,['P','O','D','B12','I'],100),F('ryb|tresk|pangas|file',100,22,0,1,0,['P','I','B12'],150),
+ F('sunk',110,20,1,3,0,['P'],50),F('vaj|vajc|vajic',155,13,1,11,0,['P','D','B12','Fat'],60),F('bielk|bielok',52,11,0.7,0.2,0,['P'],35),
+ F('tvaroh+odtuc|tvaroh+0',70,13,4,0.5,0,['P','Ca','B12'],125),F('tvaroh',120,12,4,5,0,['P','Ca','B12'],125),F('skyr',63,11,4,0.2,0,['P','Ca','B12'],150),F('cottage',100,12,3,4,0,['P','Ca','B12'],100),
+ F('greck+jogurt|greck',95,5,4,5,0,['P','Ca','B12'],150),F('jogurt',60,4,5,3,0,['P','Ca','B12','K'],150),F('mliek|mlek',47,3.3,4.8,1.5,0,['P','Ca','B12','I','K'],250),F('kefir|acidof',50,3.3,4,2.5,0,['P','Ca','B12'],250),
+ F('eidam|goud|syr|cheddar|cedar',260,28,0,17,0,['P','Ca','B12','Zn'],30),F('mozzarel',250,18,2,19,0,['P','Ca'],60),F('parmez|gran+morav',390,36,0,27,0,['P','Ca','Zn'],20),F('feta|balkan',260,14,2,21,0,['P','Ca'],30),
+ F('srvatk|whey|protein+pras|protein+odmer|protein+kokt|protein',380,75,6,6,0,['P'],30,30),F('tofu',120,14,2,6,1,['P','Ca','Fe'],150),F('tempeh',190,19,8,11,6,['P','Fe','Mg','F'],100),
+ F('sosovic+such|sosovic+sur',340,24,54,2,11,['P','F','Fe','Fo','Mg','K','Zn'],70),F('sosovic|dal',115,9,20,0.4,8,['P','F','Fe','Fo','Mg','K','Zn'],200),F('cicer',160,9,27,2.6,7.6,['P','F','Fe','Fo','Mg','Zn'],150),F('fazul',120,8,22,0.5,7,['P','F','Fe','Fo','K'],150),F('hummus',250,8,15,16,6,['P','F','Fat'],50),F('edamam',120,11,9,5,5,['P','F','Fo','Fe'],100),
+ F('hrasok|hrach',80,5,12,0.4,5,['Veg','P','F','Fe'],100),F('brokol',35,2.8,7,0.4,2.6,['Veg','C','F','Fo','Ca'],150),F('karfiol',25,2,5,0.3,2,['Veg','C','F'],150),F('spenat',23,2.9,3.6,0.4,2.2,['Veg','Fe','Fo','A','Mg'],100),F('mrkv',41,0.9,10,0.2,2.8,['Veg','A','F'],100),
+ F('kysl+kapust',20,1,4,0.1,3,['Veg','C','F'],100),F('kapust',25,1.3,6,0.1,2.5,['Veg','C','F'],100),F('paradaj|rajcin|cherry',18,0.9,3.9,0.2,1.2,['Veg','C','K'],100),F('uhork',15,0.7,3.6,0.1,0.5,['Veg'],100),F('paprik',30,1,6,0.3,2,['Veg','C','A'],100),
+ F('salat|rukol|ladov',15,1.4,3,0.2,1.3,['Veg','Fo'],50),F('cibul|por',40,1.1,9,0.1,1.7,['Veg'],50),F('cuket|tekvic',17,1.2,3,0.3,1,['Veg','K'],100),F('zelenin|mix|zmes',45,2.5,7,0.5,5,['Veg','F','A','C'],200),F('kukuric',90,3,19,1,2,['Veg','Carb'],100),F('cesnak',150,6,30,0,2,['Veg'],5),
+ F('banan',89,1.1,23,0.3,2.6,['Fru','K','Mg'],120),F('jablk',52,0.3,14,0.2,2.4,['Fru','F'],180),F('hrusk',57,0.4,15,0.1,3,['Fru','F'],180),F('pomaranc',47,0.9,12,0.1,2.4,['Fru','C','Fo'],180),F('mandarin',53,0.8,13,0.3,1.8,['Fru','C'],80),F('kivi',61,1.1,15,0.5,3,['Fru','C','F','K'],75),
+ F('jahod',32,0.7,8,0.3,2,['Fru','C'],150),F('cucoried',57,0.7,14,0.3,2.4,['Fru','F'],100),F('malin',52,1.2,12,0.7,6.5,['Fru','F','C'],100),F('lesn|bobul|mraz+ovoc',50,1,10,0.5,5,['Fru','F','C'],100),F('hrozn',69,0.7,18,0.2,0.9,['Fru'],150),F('mango',60,0.8,15,0.4,1.6,['Fru','A','C'],150),F('ananas',50,0.5,13,0.1,1.4,['Fru','C'],150),F('melon',30,0.6,8,0.2,0.4,['Fru','C','A'],300),F('sliv|broskyn|nektar|marhul',46,0.7,11,0.3,1.5,['Fru','F'],150),F('datl|hrozienk|susen',300,2.5,75,0.5,7,['Fru','Fe','K','F'],30),
+ F('avokad',160,2,9,15,7,['Fat','K','Fo','F'],100),F('arasid+masl|pb|peanut',600,25,13,50,7,['Fat','P','Mg'],15,15),F('arasid',570,26,16,49,8,['Fat','P','Mg'],30),F('mandl',580,21,22,50,12,['Fat','Ca','Mg','F'],30),F('vlassk|orech',650,15,14,65,7,['Fat','O','Mg'],30),F('kesu',550,18,30,44,3,['Fat','Mg','Zn','Fe'],30),F('liesk',630,15,17,61,10,['Fat','Mg'],30),
+ F('lan|lnen',530,18,29,42,27,['O','F','Mg'],10,10),F('chia',490,17,42,31,34,['O','F','Ca','Mg'],15,12),F('tekvic+sem|semien',560,30,11,49,6,['Fat','Zn','Mg','Fe'],20,10),F('slnecn',580,21,20,51,9,['Fat','Mg','F'],20,10),F('sezam|tahini',570,18,23,50,12,['Fat','Ca','Fe','Zn'],15,10),
+ F('oliv+olej|olej|olivov',884,0,0,100,0,['Fat'],10,10),F('masl',720,0.8,0.8,81,0,['Fat','A'],10,10),F('med',300,0,82,0,0,[],20,20),F('kakao',230,20,20,12,33,['Mg','Fe'],10,8),F('cokolad',590,10,20,45,12,['Mg','Fe'],20),F('smotan',200,2.5,3,20,0,['Fat'],30,15),F('majonez',700,1,2,75,0,['Fat'],15,15),F('kecup',100,1,25,0,1,[],15,15),F('dzem|lekvar',250,0.3,60,0,1,['Fru'],20,20),
+ F('protein+tycink|tycink',380,30,30,12,5,['P'],50),F('pizz',260,11,30,10,2,['Carb'],300),F('hamburger|burger',260,13,25,12,1.5,['P','Carb'],250),F('halusk',220,7,30,8,2,['Carb'],350),F('knedl',220,6,45,1,2,['Carb'],100),F('poliev|vyvar',40,2,5,1,1,['Veg'],300),F('gulas|segedin',120,10,5,7,1,['P','Fe'],300),F('rezen|vypraz',280,18,15,17,1,['P','Carb'],150),F('hranolk',300,4,40,14,3,['Carb'],150),F('chipsy|cips',540,6,52,34,4,[],60),
+ F('piv',43,0.5,3.5,0,0,[],500),F('vin',85,0.1,2.6,0,0,[],150),F('col|kofol|limon|sprite|fant',42,0,10.6,0,0,[],330),F('dzus|juice|smoothie',45,0.5,10,0,0.5,['Fru','C'],250),F('kav+mliek|latte|cappuc',35,1.7,3,1.5,0,['Ca'],200),F('kav|espress|caj',2,0,0,0,0,[],200),F('energ|monster|redbull',45,0,11,0,0,[],250),
+ F('kreatin',0,0,0,0,0,[],5,5),F('vitamin|omega|dopln',0,0,0,0,0,[],1)
+];
+const strip=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function foodMatch(text){
+ const t=strip(text);let best=null,bs=0;
+ FOOD100.forEach(f=>f.syn.forEach(sy=>{const parts=sy.split('+');if(parts.every(p=>t.includes(p))){const sc=parts.reduce((a,p)=>a+p.length,0)+(parts.length-1)*3;if(sc>bs){bs=sc;best=f;}}}));
+ return best;
+}
+function estimateFromText(note){
+ const chunks=String(note||'').split(/[,;\n]| \+ | a (?=\d|\p{L})/u).map(x=>x.trim()).filter(Boolean);
+ const items=[],unknown=[];
+ chunks.forEach(ch=>{
+  const f=foodMatch(ch);if(!f){unknown.push(ch);return;}
+  const m=strip(ch).match(/(\d+(?:[.,]\d+)?)\s*(kg|g|gr|gram|ml|dcl|dl|l|ks|kus|x|pl|cl|lyz|hrst|plat|krajc|odmer|balen|kock|plech|pohar|salk)?/);
+  let g=f.def;
+  if(m){const n=parseFloat(m[1].replace(',','.'));const u=m[2]||'';
+   if(u==='kg')g=n*1000;else if(u==='g'||u==='gr'||u==='gram'||u==='ml')g=n;else if(u==='dcl'||u==='dl')g=n*100;else if(u==='l')g=n*1000;else if(u==='pl'||u.startsWith('lyz'))g=n*(f.sp||15);else if(u==='cl')g=n*5;else if(u.startsWith('hrst'))g=n*30;else if(u.startsWith('plat'))g=n*25;else if(u.startsWith('krajc'))g=n*45;else if(u.startsWith('odmer'))g=n*(f.sp||30);else if(u.startsWith('pohar')||u.startsWith('salk'))g=n*250;else if(u==='ks'||u==='kus'||u==='x'||u.startsWith('balen')||u.startsWith('kock'))g=n*f.def;else g=n>=20?n:n*f.def;}
+  const k=g/100;items.push({n:ch.replace(/^\d+(?:[.,]\d+)?\s*\w*\s*/,'').trim()||ch,g:Math.round(g),kcal:Math.round(f.kcal*k),p:r1(f.p*k),c:r1(f.c*k),f:r1(f.f*k),fi:r1(f.fi*k),auto:1});
+ });
+ return {items,unknown};
+}
+function itemNu(name){const f=foodMatch(name);if(f)return f.nu||[];const items=shopItems();const k=matchCatalog(name,items);return k&&items[k]?(items[k].nu||[]):[];}
+/* koľko zdrojov denne (podľa EFSA/WHO odporúčaní) – A a omega-3 stačí niekoľkokrát do týždňa */
+const NUTR_DAY={P:3,F:3,Ca:2,C:2,K:2,Mg:2,Carb:2,Veg:3,Fru:2,Fat:1,B12:1,Fe:1,Fo:1,Zn:1,I:1,D:1,A:.5,O:.3};
+function periodNutrition(days){
+ const t=today();const from=addDays(t,-days+1);const daysList=[];for(let i=0;i<days;i++){const d=addDays(from,i);if(d<=t)daysList.push(d);}
+ const tot={kcal:0,p:0,c:0,f:0,fi:0};const cnt={};Object.keys(NUTR).forEach(k=>cnt[k]=0);let logged=0;const perDay=[];
+ daysList.forEach(d=>{const ms=(D.meals||[]).filter(m=>m.d===d);if(!ms.length){perDay.push(null);return;}logged++;const dt={kcal:0,p:0,c:0,f:0,fi:0};const dn=new Set();ms.forEach(m=>{const mt=m.tot||{};['kcal','p','c','f','fi'].forEach(k=>{tot[k]+=+mt[k]||0;dt[k]+=+mt[k]||0;});(m.items&&m.items.length?m.items.map(i=>i.n):[m.name||'']).forEach(n=>itemNu(n).forEach(x=>dn.add(x)));});dn.forEach(x=>cnt[x]++);perDay.push(dt);});
+ return {tot,cnt,logged,days:daysList.length,perDay,daysList};
+}
 /* =====================================================================
    JEDLO · denník / recepty / príručka
    ===================================================================== */
-const FOOD={sub:'diary',day:today(),rf:'all',rs:'score'};
+const FOOD={sub:'diary',day:today(),rf:'all',rs:'score',per:1};
 const srcify=s=>String(s).replace(/\[(\d+)\]/g,'<sup class="src">[$1]</sup>');
 function renderFood(){
  const sec=$('tab-food');
@@ -1658,23 +1798,31 @@ function macroBars(tot,tg,cls=''){
  return `<div class="macro ${cls}">${rows.map(([k,l,t,col])=>{const v=Math.round(tot[k]||0);const pct=t?clamp(v/t,0,1.4):0;return `<div><b style="color:${col}">${v}</b><span>${l}${t?' / '+t:''}</span><i><b style="width:${Math.min(100,pct*100)}%;background:${pct>1.15&&k!=='p'&&k!=='fi'?'#FB7185':col}"></b></i></div>`;}).join('')}</div>`;
 }
 function renderDiary(){
- const el=$('foodBody');const day=FOOD.day;const bw=latestBw(ME,D);const tg=targets(ME,bw);const tot=mealTotals(day);
+ const el=$('foodBody');const day=FOOD.day;const bw=latestBw(ME,D);const tg=targets(ME,bw);const per=FOOD.per||1;
  const meals=(D.meals||[]).filter(m=>m.d===day).sort((a,b)=>(a.t||'')<(b.t||'')?-1:1);
- const pending=(D.meals||[]).filter(m=>m.ai==='pending').length;const avg=mealsAvg(7);
+ const pn=periodNutrition(per);const lg=Math.max(1,pn.logged);const avg={};['kcal','p','c','f','fi'].forEach(k=>avg[k]=Math.round(pn.tot[k]/lg));
+ const tot=per===1?mealTotals(day):avg;
+ const cover=Object.keys(NUTR).map(k=>{const need=NUTR_DAY[k]*lg;const have=pn.cnt[k];const r=need?have/need:1;return {k,have,need,r,st:r>=.8?'ok':r>=.4?'low':'miss'};});
+ const okN=cover.filter(c=>c.st==='ok').length;const missing=cover.filter(c=>c.st!=='ok').sort((a,b)=>a.r-b.r);
+ const sed=ME.act!=='act';
  el.innerHTML=`
- <div class="dayrow"><button class="btn" id="dPrev">‹</button><b>${day===today()?'Dnes':fmtDY(day)}</b><button class="btn" id="dNext" ${day>=today()?'disabled':''}>›</button></div>
- <div class="card hero">${macroBars(tot,tg)}<div class="tiny mute" style="margin-top:8px">${tg.kcal?`Cieľ pre „${{bulk:'nabrať',recomp:'svaly + tuk dole',cut:'schudnúť',maintain:'udržať'}[ME.goal]}“: ${tg.kcal} kcal · ${tg.p} g bielkovín (${tg.pk} g/kg) · tuky ${tg.f} g · sacharidy ${tg.c} g · vláknina ${tg.fi} g`:'Doplň váhu, výšku a vek v profile – ukážu sa ti ciele na deň.'}${avg?` · priemer 7 dní: ${avg.kcal} kcal, ${avg.p} g B (${avg.days} dní so záznamom)`:''}</div></div>
- <div class="row wrap" style="gap:8px;margin-bottom:12px"><button class="btn pri grow" id="mealNew">＋ Jedlo</button><button class="btn" id="mealCam">📷 Odfoť</button><button class="btn" id="mealBulk">📥 Viac fotiek</button></div>
- ${pending?`<div class="banner row" style="gap:8px"><span class="grow">✦ ${pending} ${pending===1?'jedlo čaká':pending<5?'jedlá čakajú':'jedál čaká'} na analýzu fotky${AI.mode()?'':' – zapni AI v nastaveniach'}</span>${AI.mode()?'<button class="btn sm" id="mealAnalyzeAll" style="border-color:var(--amber);color:var(--amber);background:transparent">Analyzovať</button>':''}</div>`:''}
- <div class="card"><h2>${meals.length?'Jedlá':'Zatiaľ nič'}</h2>${meals.length?meals.map(m=>`<div class="meal${m.ai==='pending'?' pending':''}" data-meal="${m.id}">${m.th?`<img class="th" src="${m.th}" alt="">`:`<div class="th">${m.ai==='pending'?'⏳':'🍽️'}</div>`}<div class="grow"><div class="mn">${esc(m.name||(m.ai==='pending'?'Čaká na analýzu':'Jedlo'))}</div><div class="ms">${m.t||''}${m.items&&m.items.length?' · '+m.items.slice(0,3).map(i=>i.n).join(', ')+(m.items.length>3?'…':''):m.note?' · '+esc(m.note.slice(0,50)):''}</div></div><div class="mk">${Math.round((m.tot||{}).kcal||0)}<small>${Math.round((m.tot||{}).p||0)} g B</small></div></div>`).join(''):'<p class="small mute" style="margin:0">Pridaj jedlo ručne, odfoť ho, alebo nahraj viac fotiek naraz – Claude doplní gramáže a makrá.</p>'}</div>
- <div class="card"><h2>Denný checklist</h2><div class="dchk" id="dchk">${FOODCHK.map(([k,e,l])=>`<button data-fc="${k}" aria-pressed="${((D.food||{})[day]||[]).includes(k)}"><span class="e">${e}</span>${l}</button>`).join('')}</div><div class="tiny mute" style="margin-top:6px">počíta sa do zeleného kruhu a leaderboardu</div></div>`;
- $('dPrev').onclick=()=>{FOOD.day=addDays(FOOD.day,-1);renderDiary();};$('dNext').onclick=()=>{if(FOOD.day<today()){FOOD.day=addDays(FOOD.day,1);renderDiary();}};
+ <div class="seg" id="fPer" style="margin-bottom:10px"><button data-v="1" aria-pressed="${per===1}">Deň</button><button data-v="2" aria-pressed="${per===2}">2 dni</button><button data-v="7" aria-pressed="${per===7}">Týždeň</button><button data-v="30" aria-pressed="${per===30}">30 dní</button></div>
+ ${per===1?`<div class="dayrow"><button class="btn" id="dPrev">‹</button><b>${day===today()?'Dnes':fmtDY(day)}</b><button class="btn" id="dNext" ${day>=today()?'disabled':''}>›</button></div>`:`<p class="small mute" style="margin:0 0 8px">Priemer na deň z <b>${pn.logged}</b> zaznamenaných dní (z ${pn.days}).</p>`}
+ <div class="card hero">${macroBars(tot,tg)}<div class="tiny mute" style="margin-top:8px">${tg.kcal?`Cieľ: ${tg.kcal} kcal · ${tg.p} g B (${tg.pk} g/kg) · ${tg.c} g S · ${tg.f} g T · ${tg.fi} g vlákniny${tg.src==='claude'?' · ✦ od Claude':''}${sed?' · sedavý režim (PC)':''}`:'Doplň váhu, výšku a vek v profile – ukážu sa ti ciele.'}</div></div>
+ <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn pri grow" id="mealNew">＋ Jedlo</button><button class="btn" id="mealCam">📷</button><button class="btn" id="mealBulk">📥 viac</button></div>
+ ${per===1?`<div class="card"><h2>${meals.length?'Jedlá':'Zatiaľ nič'}</h2>${meals.length?meals.map(m=>`<div class="meal${m.ai==='pending'?' pending':''}" data-meal="${m.id}">${m.th?`<img class="th" src="${m.th}" alt="">`:`<div class="th">${m.ai==='pending'?'⏳':'🍽️'}</div>`}<div class="grow"><div class="mn">${esc(m.name||(m.note?m.note.slice(0,40):'Jedlo'))}</div><div class="ms">${m.t||''}${m.items&&m.items.length?' · '+m.items.slice(0,3).map(i=>i.n).join(', ')+(m.items.length>3?'…':''):''}</div></div><div class="mk">${Math.round((m.tot||{}).kcal||0)}<small>${Math.round((m.tot||{}).p||0)} g B</small></div></div>`).join(''):'<p class="small mute" style="margin:0">Napíš, čo si jedol („80 g vločiek, 250 ml mlieka, banán“) – appka odhadne kalórie a makrá sama. Fotku pridaj, ak chceš, Claude ju pri exporte doplní.</p>'}</div>`:''}
+ <div class="card"><div class="row" style="margin-bottom:8px"><h2 class="grow">Živiny · ${per===1?'dnes':per+' dní'}</h2><span class="badge" style="background:${okN>=14?'var(--mint-s)':okN>=9?'var(--amber-s)':'var(--rose-s)'};color:${okN>=14?'var(--mint)':okN>=9?'var(--amber)':'var(--rose)'}">${okN}/${cover.length}</span></div>
+  ${pn.logged?`<div class="nutrd">${cover.map(c=>`<div class="${c.st}"><span>${NUTR[c.k].e}</span>${NUTR[c.k].n}<small>${c.have}/${Math.ceil(c.need)}</small></div>`).join('')}</div>${missing.length?`<div class="small" style="margin-top:8px">${missing.slice(0,3).map(c=>`<div style="margin:5px 0"><b>${NUTR[c.k].e} ${NUTR[c.k].n}</b>: ${esc(NUTR[c.k].tip)}</div>`).join('')}</div>`:'<div class="small" style="margin-top:8px;color:var(--mint)">Všetky živiny majú zdroj. 💪</div>'}<p class="tiny mute" style="margin:8px 0 0">Počíta zdroje živín z názvov jedál (napr. 3 zdroje bielkovín/deň). Omega-3 a vit. A stačia 2–3× do týždňa.</p>`:'<p class="small mute" style="margin:0">Zatiaľ žiadne jedlá v tomto období.</p>'}
+ </div>
+ ${per>1&&pn.logged?`<div class="card"><h2>Stats</h2><table class="t"><tr><th>Deň</th><th class="right">kcal</th><th class="right">B</th><th class="right">S</th><th class="right">T</th><th class="right">Vl.</th></tr>${pn.daysList.map((d,i)=>pn.perDay[i]?`<tr><td>${fmtD(d)}</td><td class="right mono" style="color:${tg.kcal&&Math.abs(pn.perDay[i].kcal-tg.kcal)>tg.kcal*.2?'var(--amber)':'inherit'}">${Math.round(pn.perDay[i].kcal)}</td><td class="right mono" style="color:${tg.p&&pn.perDay[i].p<tg.p*.8?'var(--rose)':'var(--mint)'}">${Math.round(pn.perDay[i].p)}</td><td class="right mono">${Math.round(pn.perDay[i].c)}</td><td class="right mono">${Math.round(pn.perDay[i].f)}</td><td class="right mono">${Math.round(pn.perDay[i].fi)}</td></tr>`:'').join('')}</table><p class="tiny mute" style="margin:8px 0 0">Bielkoviny ${tg.p?Math.round(avg.p/tg.p*100)+' %':'—'} cieľa · kalórie ${tg.kcal?Math.round(avg.kcal/tg.kcal*100)+' %':'—'} · vláknina ${Math.round(avg.fi/30*100)} %${bw?' · '+r1(avg.p/bw)+' g B/kg':''}</p></div>`:''}
+ ${per===1?`<div class="card"><h2>Denný checklist</h2><div class="dchk" id="dchk">${FOODCHK.map(([k,e,l])=>`<button data-fc="${k}" aria-pressed="${((D.food||{})[day]||[]).includes(k)}"><span class="e">${e}</span>${l}</button>`).join('')}</div></div>`:''}`;
+ $('fPer').addEventListener('seg',e=>{FOOD.per=+e.detail;renderDiary();});
+ const dp=$('dPrev');if(dp){dp.onclick=()=>{FOOD.day=addDays(FOOD.day,-1);renderDiary();};$('dNext').onclick=()=>{if(FOOD.day<today()){FOOD.day=addDays(FOOD.day,1);renderDiary();}};}
  $('mealNew').onclick=()=>openMeal(null);
  $('mealCam').onclick=()=>{MEALPICK='new';$('mealPhotos').removeAttribute('multiple');$('mealPhotos').setAttribute('capture','environment');$('mealPhotos').click();};
  $('mealBulk').onclick=()=>{MEALPICK='bulk';$('mealPhotos').setAttribute('multiple','');$('mealPhotos').removeAttribute('capture');$('mealPhotos').click();};
- const aa=$('mealAnalyzeAll');if(aa)aa.onclick=async()=>{aa.disabled=true;aa.textContent='…';await analyzePending(t=>aa.textContent=t);renderDiary();};
  el.querySelectorAll('[data-meal]').forEach(x=>x.onclick=()=>openMeal(x.dataset.meal));
- el.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{const k=b.dataset.fc;D.food=D.food||{};const arr=D.food[day]||[];const i=arr.indexOf(k);if(i>=0)arr.splice(i,1);else{arr.push(k);buzz(8);}D.food[day]=arr;save();renderDiary();if(arr.length===FOODCHK.length){confetti('#34D399');toast('Celý deň splnený 🥦💪');}});
+ el.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{const k=b.dataset.fc;D.food=D.food||{};const arr=D.food[day]||[];const i=arr.indexOf(k);if(i>=0)arr.splice(i,1);else{arr.push(k);buzz(8);}D.food[day]=arr;save();renderDiary();});
 }
 let MEALPICK='new',MEAL=null,mealSaveT=null;
 $('mealPhotos').addEventListener('change',async e=>{
@@ -1705,8 +1853,8 @@ async function renderMealEditor(){
  <label class="lbl">Názov</label><input id="mName" value="${esc(m.name||'')}" placeholder="napr. Ovsená kaša s banánom">
  <label class="lbl">Čo si zjedol (gramáže, ak vieš)</label><textarea id="mNote" rows="2" placeholder="napr. 80 g vločiek, 250 ml mlieka, banán, lyžica arašidového masla">${esc(m.note||'')}</textarea>
  <div class="photos">${photos.map((p,i)=>p?`<img src="${p}" alt="" data-ph="${i}">`:`<div class="th" style="width:72px;height:72px;border-radius:12px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mute);text-align:center">fotka je v inom telefóne</div>`).join('')}<button class="btn sm" id="mAddPhoto" style="height:72px;border-radius:12px">📷 ＋</button></div>
- <div class="row" style="gap:8px;margin-top:12px"><button class="btn pri grow" id="mAI" ${AI.mode()?'':'disabled'}>✦ ${m.items&&m.items.length?'Skontrolovať a doplniť':'Analyzovať s Claude'}</button></div>
- ${AI.mode()?'':'<p class="tiny mute" style="margin:6px 0 0">AI je vypnutá – zadaj API kľúč v nastaveniach (avatar) alebo otvor appku cez Claude.</p>'}
+ <div class="row" style="gap:8px;margin-top:12px"><button class="btn pri grow" id="mEst">⚡ Odhadnúť z popisu</button>${AI.mode()?`<button class="btn" id="mAI">✦ Claude</button>`:''}</div>
+ <div id="mEstNote" class="tiny mute" style="margin:6px 0 0">Odhad z databázy bežných potravín (na 100 g). Presné makrá dostaneš pri exporte pre Claude.</div>
  <div id="mAiNote">${m.aiNote?`<div class="ainote">✦ ${esc(m.aiNote)}</div>`:''}</div>
  <div class="itemhead"><span>Položka</span><span>g</span><span>kcal</span><span>B g</span></div>
  <div id="mItems">${(m.items||[]).map((it,i)=>itemRowHTML(it,i)).join('')}</div>
@@ -1716,11 +1864,12 @@ async function renderMealEditor(){
  $('mDate').onchange=e=>{m.d=e.target.value||today();mealFlush();};$('mTime').onchange=e=>{m.t=e.target.value;mealFlush();};
  $('mName').oninput=e=>{m.name=e.target.value;$('mealTitle').textContent=m.name||'Jedlo';mealFlush();};$('mNote').oninput=e=>{m.note=e.target.value;mealFlush();};
  $('mAddPhoto').onclick=()=>{MEALPICK='meal';$('mealPhotos').setAttribute('multiple','');$('mealPhotos').removeAttribute('capture');$('mealPhotos').click();};
- $('mAI').onclick=()=>analyzeMealUI();
+ const mai=$('mAI');if(mai)mai.onclick=()=>analyzeMealUI();
+ $('mEst').onclick=()=>{const r=estimateFromText(m.note||m.name);if(!r.items.length){$('mEstNote').innerHTML='<span style="color:var(--amber)">Nič som nespoznal – napíš položky s gramami, napr. „150 g kura, 200 g ryža, brokolica“.</span>';return;}m.items=r.items;m.tot=sumItems(m.items);m.ai='done';mealFlush();renderMealEditor().then(()=>{const n=$('mEstNote');if(n)n.innerHTML=(r.unknown.length?'<span style="color:var(--amber)">Nepoznám: '+esc(r.unknown.join(', '))+' – doplň ručne.</span> ':'')+'Odhadnuté – uprav gramy, ak treba.';});};
  $('mAddItem').onclick=()=>{m.items=m.items||[];m.items.push({n:'',g:0,kcal:0,p:0,c:0,f:0,fi:0});renderMealEditor().then(()=>{const rows=$('mItems').querySelectorAll('.itemrow');const r=rows[rows.length-1];if(r)r.querySelector('input').focus();});};
  body.querySelectorAll('[data-tot]').forEach(inp=>inp.oninput=e=>{m.tot=m.tot||{};m.tot[e.target.dataset.tot]=parseFloat(e.target.value)||0;mealFlush();});
  bindItemRows();
- $('mDone').onclick=()=>{clearTimeout(mealSaveT);if(MEAL.items&&MEAL.items.length)MEAL.tot=sumItems(MEAL.items);const idx=D.meals.findIndex(x=>x.id===MEAL.id);const has=(MEAL.items||[]).length||MEAL.name||MEAL.note||(MEAL.ph||[]).length;if(has){MEAL.u=Date.now();if(idx<0)D.meals.push(MEAL);else D.meals[idx]=MEAL;}save();closeSheet('shMeal');if(curTab==='food')renderDiary();};
+ $('mDone').onclick=()=>{clearTimeout(mealSaveT);if(!(MEAL.items&&MEAL.items.length)&&!((MEAL.tot||{}).kcal)&&(MEAL.note||MEAL.name)){const r=estimateFromText(MEAL.note||MEAL.name);if(r.items.length){MEAL.items=r.items;MEAL.ai=MEAL.ph&&MEAL.ph.length?'pending':'done';}}if(MEAL.items&&MEAL.items.length)MEAL.tot=sumItems(MEAL.items);const idx=D.meals.findIndex(x=>x.id===MEAL.id);const has=(MEAL.items||[]).length||MEAL.name||MEAL.note||(MEAL.ph||[]).length;if(has){MEAL.u=Date.now();if(idx<0)D.meals.push(MEAL);else D.meals[idx]=MEAL;}save();closeSheet('shMeal');if(curTab==='food')renderDiary();};
  const del=$('mDel');if(del)del.onclick=async()=>{if(await ask('Zmazať toto jedlo?',{ok:'Zmazať',danger:true})){for(const pid of (m.ph||[]))await idbDel(pid);D.meals=D.meals.filter(x=>x.id!==m.id);save();closeSheet('shMeal');renderDiary();}};
 }
 function itemRowHTML(it,i){return `<div class="itemrow" data-i="${i}"><input value="${esc(it.n||'')}" placeholder="názov" data-k="n"><input class="g" type="number" inputmode="decimal" value="${it.g||''}" placeholder="g" data-k="g"><input class="k" type="number" inputmode="decimal" value="${it.kcal||''}" placeholder="kcal" data-k="kcal"><input class="p" type="number" inputmode="decimal" value="${it.p||''}" placeholder="B" data-k="p"></div>`;}
@@ -1802,6 +1951,7 @@ function renderGuide(){
  <div class="card"><h2>9 pravidiel, ktoré stačia</h2><p class="small mute" style="margin:0 0 4px">Čítaj ako ťahák. „Prečo?“ rozbalí dôkaz, čísla v zátvorkách sú štúdie dole.</p>
   ${RULES.map((r,i)=>`<div class="rule" data-rule="${i}"><div class="e">${r.e}</div><div class="grow"><b>${esc(r.t)}</b><p>${srcify(esc(r.p))}</p><button class="whyb">Prečo? ${r.s.map(x=>'['+x+']').join('')}</button><div class="why">${srcify(esc(r.why))}</div></div></div>`).join('')}
  </div>
+ <div class="card"><h2>Ako často ktorú živinu</h2><p class="small mute" style="margin:0 0 6px">Zdroje za deň, ktoré appka sleduje v denníku. Sedavý deň pri PC neznamená menej živín – len menej kalórií; preto bielkoviny, vláknina a zelenina ostávajú rovnaké a kalórie idú dole.<sup class="src">[32]</sup></p><table class="t"><tr><th>Živina</th><th class="right">Zdrojov</th><th>Odkiaľ</th></tr>${Object.entries(NUTR).map(([k,n])=>`<tr><td>${n.e} ${n.n}</td><td class="right mono">${NUTR_DAY[k]>=1?NUTR_DAY[k]+'/deň':Math.round(NUTR_DAY[k]*7)+'/týž.'}</td><td class="small mute">${esc(n.tip)}</td></tr>`).join('')}</table></div>
  <div class="card"><h2>Tanier</h2><div class="row" style="gap:14px"><svg viewBox="0 0 100 100" width="96" height="96"><circle cx="50" cy="50" r="46" fill="#1F252C" stroke="#323A45" stroke-width="2"/><path d="M50 50 L50 4 A46 46 0 0 0 4 50 Z" fill="#34D399" opacity=".85"/><path d="M50 50 L4 50 A46 46 0 0 0 50 96 Z" fill="#34D399" opacity=".55"/><path d="M50 50 L50 96 A46 46 0 0 0 96 50 Z" fill="#FB7185" opacity=".8"/><path d="M50 50 L96 50 A46 46 0 0 0 50 4 Z" fill="#FFB547" opacity=".8"/></svg><div class="small"><b style="color:var(--mint)">½ zelenina</b> (mrazená zmes, kapusta, mrkva, šalát) – ide na tanier a do úst prvá<br><b style="color:var(--rose)">¼ bielkovina</b> (vajcia, stehná, tvaroh, šošovica)<br><b style="color:var(--amber)">¼ sacharidy</b> (ryža, zemiaky, vločky, chlieb)<br>+ lyžica tuku (olej, arašidové maslo, orechy)</div></div></div>
  <div class="card"><h2>Bielkoviny za najmenej peňazí</h2><p class="small mute" style="margin:0 0 6px">Cena za 20 g bielkovín · orientačné ceny Kaufland/Lidl 2026, uprav podľa letáku. Strukoviny kombinuj s mliečnym alebo vajcom, nech je bielkovina kompletná.</p>
   <table class="t"><tr><th>Potravina</th><th class="right">g bielk. / balenie</th><th class="right">€ / 20 g</th></tr>${prot.map(([n,g,p,c])=>`<tr><td>${esc(n)}</td><td class="right mono">${g}</td><td class="right mono" style="color:${c<.6?'var(--mint)':c<1?'var(--amber)':'var(--rose)'};font-weight:800">${c.toFixed(2)}</td></tr>`).join('')}</table>
@@ -2046,6 +2196,144 @@ async function aiAutoSync(){
  try{await aiCredoAssess();const pend=(D.meals||[]).filter(m=>m.ai==='pending').length;if(pend)await analyzePending();D.ai.lastSync=Date.now();save();if(curTab==='home')renderHome();else if(curTab==='food')renderFood();}catch(e){}
 }
 
+
+/* =====================================================================
+   EXPORT PRE CLAUDE · IMPORT OD CLAUDE (vyhodnotenie mimo appky)
+   ===================================================================== */
+function downloadText(name,text,type='text/plain'){const blob=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}
+function exportPayload(){
+ const bw=latestBw(ME,D);const tg=targets(ME,bw);const sc=scoreFor(ME,D);
+ const strength={};Object.keys(EX).forEach(id=>{const h=exHistory(D,id);if(h.length)strength[id]={name:EX[id].n,history:h.map(x=>({d:x.d,best:x.e1?`${x.w}×${x.r}`:`${x.r} opak.`,e1rm:Math.round(x.e1),tonnage:Math.round(x.ton)}))};});
+ const data=JSON.parse(JSON.stringify(D));
+ (data.meals||[]).forEach(m=>{delete m.th;delete m.ph;m.needs_estimate=!(m.items&&m.items.length)&&!((m.tot||{}).kcal);});
+ (data.recipes||[]).forEach(r=>{delete r.img;});
+ const others=PROFILES.filter(p=>p.id!==ME.id).map(p=>{const d=OTHERS[p.id]||LS.get(K.data(p.id))||blankData();const s=scoreFor(p,d);return {name:p.name,exp:p.exp,goal:p.goal,score30d:s};});
+ const sessions={};['UA','LA','UB','LB'].forEach(k=>sessions[k]={name:SESSIONS[k].n,focus:SESSIONS[k].sub,exercises:sessionExercises(k).map(x=>({id:x.id,name:exName(x),sets:x.sets,drop:!!x.drop,superset:x.ss||null}))});
+ return {app:'Cvič ty pič',exported:new Date().toISOString(),profile:Object.assign({},ME,{img:undefined}),
+  targets_now:tg,stats_30d:sc,streak_weeks:streakWeeks(D),strength,prs_14d:recentPRs(D,14),
+  health_7d:{sleep_min:healthAvg(D,7,'sleep'),steps:healthAvg(D,7,'steps'),rhr:healthAvg(D,7,'rhr'),hrv:healthAvg(D,7,'hrv')},
+  food_checklist_7d_pct:Math.round(foodAvg(D,7)),meals_avg_7d:mealsAvg(7),
+  program_current:sessions,exercise_catalog:Object.fromEntries(Object.entries(EX).map(([id,e])=>[id,e.n])),
+  data,others_leaderboard:others};
+}
+function exportPrompt(){
+ const p=exportPayload();const ids=Object.keys(EX).join(', ');
+ return `# CVIČ TY PIČ – export pre Claude · ${ME.name} · ${fmtDY(today())}
+
+## Úloha
+Si tréningový a výživový analytik appky „Cvič ty pič“. Nižšie sú KOMPLETNÉ dáta jednej osoby: profil a cieľ vlastnými slovami, všetky odcvičené tréningy (checks: s=done/skip, d=dátum, t=sila/kardio), všetky merania s váhami × opakovaniami (sets: w kg, r opakovania, d=1 dropset; w=0 = bez závažia), kardio/aktivity (acts), denník jedla (meals: items s makrami; needs_estimate=true = odhadni z name/note), zdravie (health: sleep v minútach, steps, rhr, hrv, w váha), nákupy, aktuálny program a katalóg cvikov. Blok others_leaderboard je len kontext – nikdy nemiešaj dáta iných osôb.
+
+Odpovedz PRESNE v tomto tvare a ničím iným:
+1. EXTRÉMNE STRUČNÉ bodové zhodnotenie – max 8 odrážok, každá do 15 slov, s konkrétnymi číslami (sila, konzistencia, strava, spánok/kroky, čo zlepšiť tento týždeň).
+2. Jeden blok \`\`\`json s dokumentom presne podľa schémy – bez komentárov, bez textu mimo bloku. Appka ho importuje a celá sa podľa neho prestaví.
+
+## Schéma JSON odpovede
+{
+ "ctp_ai_update": 1,
+ "profile": "${ME.id}",
+ "date": "${today()}",
+ "summary": ["odrážka 1", "…max 8"],
+ "credo": "1–2 vety, max 200 znakov, drsný humor a konkrétne číslo z dát, nikdy urážka vzhľadu/váhy",
+ "assess": "3–6 viet: kde je osoba silovo a kondične, čo ide, čo zanedbáva, jedna konkrétna vec na tento týždeň",
+ "targets": {"kcal": 0, "p": 0, "c": 0, "f": 0, "fi": 30, "water": 0},
+ "next": {"<id cviku>": {"w": 0, "r": "8–10", "note": "max 6 slov"}},
+ "plan": {"UA": [{"id": "mcp", "sets": "3 × 6–10", "drop": 1}]},
+ "recommendations": [{"t": "Krátky nadpis", "d": "1–2 vety, konkrétne, s číslom"}],
+ "meals": [{"id": "<id jedla>", "name": "názov", "items": [{"n": "položka", "g": 0, "kcal": 0, "p": 0, "c": 0, "f": 0, "fi": 0}], "note": "čo si odhadol"}],
+ "nutrients": {"missing": ["…"], "ok": ["…"], "note": "1–2 vety o krytí mikroživín za 7 dní"},
+ "health": {"note": "1–2 vety o spánku/tepe/krokoch, ak sú dáta"},
+ "recipes": [{"t": "názov", "cat": "raňajky|obed|večera|snack|sladké", "grp": "", "time": "", "ing": ["…"], "steps": ["…"], "m": {"kcal": 0, "p": 0, "c": 0, "f": 0, "fi": 0}}],
+ "profile_patch": {"bw": 0, "bf": 0},
+ "warnings": ["…"]
+}
+Pravidlá pre polia: targets = denné ciele pre tento profil (cieľ, % tuku, sedavý režim: TDEE ≈ BMR × 1,4–1,5 + tréningy); next = váha a opakovania na najbližší tréning pre KAŽDÝ cvik, ktorý má aspoň jedno meranie (dvojitá progresia: horný okraj opakovaní vo všetkých sériách → +2,5 kg upper / +5 kg lower; dropsety nepočítaj do 1RM); plan uveď LEN ak odporúčaš zmenu programu (povolené id: ${ids}); meals vráť len pre jedlá s needs_estimate=true; recipes max 4 nové z denníka, inak []; profile_patch len ak z dát jasne vyplýva (napr. nová váha), inak vynechaj; warnings len pri reálnom riziku.
+
+## Pravidlá hodnotenia
+- Štúdie: bielkoviny 1,6–2,2 g/kg (pri cut 2,0–2,4), vláknina 25–35 g, 8–10 tisíc krokov, spánok 7–9 h, HIIT 2×/týž. po upper dňoch, LISS 2×, deload každých 6–8 týždňov, zdravé chudnutie 0,35–0,7 % váhy/týždeň, kreatín 3–5 g, vitamín D v zime, omega-3 2× ryba/týždeň alebo ľan, vápnik 2–3 mliečne porcie, 400–800 g zeleniny a ovocia.
+- Sila = odhad 1RM (Epley w×(1+r/30)) medzi meraniami; každá séria do zlyhania, 2–3 série/cvik.
+- Program: Upper A (hruď+ramená), Lower A (kvadricepsy+lýtka+kríže so závažím), Upper B (chrbát+ruky), Lower B (hip thrust+zadný reťazec+kríže bez závažia). Bez mŕtveho ťahu, drepov s tyčou a tlakov nad hlavu v stoji; kladky/stroje; Nippardove S-tier cviky. Osoba s dia=true má diastázu (žiadne skracovačky/planky s tlakom von).
+- Slovensky, tykaj, stručne, žiadne frázy.
+
+## Dáta
+\`\`\`json
+${JSON.stringify(p)}
+\`\`\`
+`;
+}
+function openExport(){
+ const txt=exportPrompt();const kb=Math.round(txt.length/1024);
+ $('expBody').innerHTML=`<p class="small" style="margin:0 0 10px">Hotový prompt + všetky dáta (${kb} kB, bez fotiek). Vlož ho Claudovi do samostatného chatu „Cvič ty pič – vyhodnotenie“. Odpoveď s JSON blokom potom daj do Importu.</p>
+ <button class="btn pri wide" id="expCopy">📋 Skopírovať do schránky</button><div style="height:8px"></div>
+ <div class="row" style="gap:8px"><button class="btn grow" id="expShare">📲 Zdieľať (napr. do Claude)</button><button class="btn grow" id="expDl">⬇️ Stiahnuť .md</button></div>
+ <p class="tiny mute" style="margin:10px 0 0">Fotky jedla sa neexportujú – ak chceš, prilož ich v chate ručne; Claude odhadne z popisu. Jedlá bez makier sú označené needs_estimate.</p>
+ <details class="acc" style="margin-top:10px"><summary class="tiny mute">Zobraziť text</summary><div class="body"><textarea readonly style="height:200px;font:11px var(--mono)">${esc(txt)}</textarea></div></details>`;
+ $('expCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('Skopírované ✔ – vlož do Claude');}catch(e){const ta=$('expBody').querySelector('textarea');ta.closest('details').open=true;ta.select();try{document.execCommand('copy');toast('Skopírované ✔');}catch(err){toast('Skopíruj text ručne');}}};
+ $('expShare').onclick=async()=>{if(navigator.share){try{await navigator.share({title:'Cvič ty pič – export',text:txt});}catch(e){}}else{toast('Zdieľanie tu nejde – použi Kopírovať');}};
+ $('expDl').onclick=()=>downloadText(`cvictypic-export-${ME.name}-${today()}.md`,txt,'text/markdown');
+ openSheet('shExport');
+}
+function openImport(){
+ $('impBody').innerHTML=`<p class="small" style="margin:0 0 10px">Vlož celú odpoveď od Claude (stačí, že obsahuje JSON blok) alebo nahraj súbor. Funguje aj na zálohu z inej verzie appky – dáta sa zlúčia, nič sa neprepíše.</p>
+ <textarea id="impText" rows="7" placeholder="Sem vlož odpoveď od Claude…"></textarea>
+ <div class="row" style="gap:8px;margin-top:8px"><button class="btn pri grow" id="impGo">📥 Importovať</button><button class="btn" id="impFileBtn">📂 Súbor</button></div>
+ <input type="file" id="impFile" accept=".json,.txt,.md,application/json,text/plain,text/markdown" style="position:absolute;opacity:0;width:1px;height:1px">
+ <div class="small" id="impStatus" style="margin-top:8px"></div>`;
+ const run=txt=>{try{const r=importAny(txt);$('impStatus').innerHTML='<span style="color:var(--mint)">✔ '+esc(r)+'</span>';buzz([10,30,10]);confetti('#5B8CFF');setTimeout(()=>{closeSheet('shImport');renderAll();},900);}catch(e){$('impStatus').innerHTML='<span style="color:var(--rose)">'+esc(e.message||e)+'</span>';}};
+ $('impGo').onclick=()=>run($('impText').value);
+ $('impFileBtn').onclick=()=>$('impFile').click();
+ $('impFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(f)run(await f.text());};
+ openSheet('shImport');
+}
+function extractJson(txt){
+ const fence=txt.match(/```json\s*([\s\S]*?)```/i);if(fence){try{return JSON.parse(fence[1]);}catch(e){}}
+ const i=txt.indexOf('{');if(i<0)throw new Error('V texte nie je JSON.');
+ let depth=0,inStr=false,escp=false;for(let j=i;j<txt.length;j++){const c=txt[j];if(inStr){if(escp)escp=false;else if(c==='\\')escp=true;else if(c==='"')inStr=false;continue;}if(c==='"')inStr=true;else if(c==='{')depth++;else if(c==='}'){depth--;if(depth===0){return JSON.parse(txt.slice(i,j+1));}}}
+ throw new Error('JSON nie je uzavretý.');
+}
+function importAny(txt){
+ const j=extractJson(txt);
+ if(j.ctp_ai_update)return applyAiUpdate(j);
+ if(j.data&&(j.data.checks||j.data.logs))return mergeData(normData(j.data));
+ if(j.checks||j.logs)return mergeData(normData(j));
+ throw new Error('Nepoznám formát – čakám odpoveď od Claude (ctp_ai_update) alebo zálohu appky.');
+}
+function mergeData(src){
+ let n=0;src.logs.forEach(l=>{if(!D.logs.find(x=>x.id===l.id)&&!D.logs.find(x=>x.date===l.date&&x.session===l.session&&logTonnage(x)===logTonnage(l))){D.logs.push(l);n++;}});
+ (src.acts||[]).forEach(a=>{if(!D.acts.find(x=>x.id===a.id)){D.acts.push(a);n++;}});
+ Object.entries(src.checks||{}).forEach(([wk,bl])=>{D.checks[wk]=D.checks[wk]||{};Object.entries(bl).forEach(([k,v])=>{if(!D.checks[wk][k]){D.checks[wk][k]=v;n++;}});});
+ (src.meals||[]).forEach(m=>{if(!D.meals.find(x=>x.id===m.id)){D.meals.push(m);n++;}});
+ (src.recipes||[]).forEach(r=>{if(!D.recipes.find(x=>x.id===r.id)){D.recipes.push(r);n++;}});
+ (src.body||[]).forEach(b=>{if(!D.body.find(x=>x.d===b.d)){D.body.push(b);n++;}});
+ Object.entries(src.health||{}).forEach(([d,h])=>{D.health[d]=Object.assign({},h,D.health[d]||{});n++;});
+ Object.entries(src.food||{}).forEach(([d,arr])=>{D.food[d]=[...new Set([...(D.food[d]||[]),...arr])];});
+ Object.entries((src.shop||{}).pins||{}).forEach(([k,v])=>{D.shop.pins[k]=v;});
+ if(src.plan)Object.entries(src.plan).forEach(([k,v])=>{if(!D.plan[k])D.plan[k]=v;});
+ if(src.ai&&src.ai.credo&&!(D.ai.credo&&D.ai.credo.d>=src.ai.credo.d))D.ai.credo=src.ai.credo;
+ if(src.game&&(!D.game||(src.game.best||0)>(D.game.best||0)))D.game=src.game;
+ if(src.created&&src.created<D.created)D.created=src.created;
+ save();return `Zlúčené ${n} záznamov (tréningy, merania, jedlo, zdravie).`;
+}
+function applyAiUpdate(j){
+ if(j.profile&&j.profile!==ME.id){const p=PROFILES.find(x=>x.id===j.profile);throw new Error(`Tento dokument je pre profil „${p?p.name:j.profile}“ – prepni sa naň a importuj tam.`);}
+ const d=j.date&&/^\d{4}-\d{2}-\d{2}$/.test(j.date)?j.date:today();const done=[];
+ D.ai=D.ai||{};
+ if(Array.isArray(j.summary)&&j.summary.length){D.ai.summary={d,items:j.summary.map(x=>String(x).slice(0,160)).slice(0,10)};done.push('zhodnotenie');}
+ if(j.credo){D.ai.credo={d,text:String(j.credo).slice(0,260)};done.push('kredo');}
+ if(j.assess){D.ai.assess={d,text:String(j.assess).slice(0,1200)};}
+ if(j.targets&&typeof j.targets==='object'){const t={};['kcal','p','c','f','fi','water'].forEach(k=>{const v=+j.targets[k];if(v>0)t[k]=v;});if(Object.keys(t).length){D.targets=Object.assign({d},t);done.push('ciele stravy');}}
+ if(j.next&&typeof j.next==='object'){const nx={};Object.entries(j.next).forEach(([id,v])=>{if(v&&typeof v==='object')nx[id]={w:+v.w||0,r:String(v.r||'').slice(0,12),note:String(v.note||'').slice(0,60)};});D.ai.next={d,ex:nx};done.push(`odporúčané váhy (${Object.keys(nx).length})`);}
+ if(j.plan&&typeof j.plan==='object'){let n=0;Object.entries(j.plan).forEach(([k,arr])=>{if(!SESSIONS[k]||!Array.isArray(arr)||!arr.length)return;const list=arr.filter(x=>x&&(EX[x.id]||x.nm)).map(x=>({id:EX[x.id]?x.id:'c:'+uid().slice(0,6),nm:EX[x.id]?String(x.nm||''):String(x.nm||x.id),sets:String(x.sets||'2 × 8–12'),drop:x.drop?1:0,ss:x.ss||'',k:uid()}));if(list.length){D.plan[k]=list;n++;}});if(n)done.push(`program (${n} tréningy)`);}
+ if(Array.isArray(j.recommendations)){D.ai.recs={d,items:j.recommendations.filter(x=>x&&x.t).slice(0,8).map(x=>({t:String(x.t).slice(0,60),d:String(x.d||'').slice(0,300)}))};done.push('odporúčania');}
+ if(Array.isArray(j.meals)){let n=0;j.meals.forEach(m=>{const t=D.meals.find(x=>x.id===m.id);if(!t)return;if(Array.isArray(m.items)&&m.items.length){t.items=m.items.map(i=>({n:String(i.n||'').slice(0,60),g:+i.g||0,kcal:Math.round(+i.kcal||0),p:r1(+i.p||0),c:r1(+i.c||0),f:r1(+i.f||0),fi:r1(+i.fi||0)}));t.tot=sumItems(t.items);}if(m.name&&!t.name)t.name=String(m.name).slice(0,60);if(m.note)t.aiNote=String(m.note).slice(0,300);t.ai='done';t.u=Date.now();n++;});if(n)done.push(`jedlá (${n})`);}
+ if(j.nutrients&&typeof j.nutrients==='object'){D.ai.nutrients={d,missing:(j.nutrients.missing||[]).map(String),ok:(j.nutrients.ok||[]).map(String),note:String(j.nutrients.note||'').slice(0,300)};}
+ if(j.health&&j.health.note){D.ai.health={d,note:String(j.health.note).slice(0,300)};}
+ if(Array.isArray(j.recipes)){let n=0;j.recipes.forEach(r=>{if(!r||!r.t)return;const nt=norm(r.t);if(allRecipes().some(x=>norm(x.t)===nt))return;D.recipes.push({id:'ai'+uid(),t:String(r.t).slice(0,60),s:String(r.s||'').slice(0,80),cat:RCATS.includes(r.cat)?r.cat:'obed',grp:String(r.grp||'').slice(0,40),time:String(r.time||'').slice(0,20),ing:(r.ing||[]).map(String),steps:(r.steps||[]).map(String),serve:String(r.serve||''),m:{kcal:+((r.m||{}).kcal)||0,p:+((r.m||{}).p)||0,c:+((r.m||{}).c)||0,f:+((r.m||{}).f)||0,fi:+((r.m||{}).fi)||0},img:'',src:'ai',d});n++;});if(n)done.push(`recepty (${n})`);}
+ if(j.profile_patch&&typeof j.profile_patch==='object'){let ch=false;['bw','bf','bfT','h','age'].forEach(k=>{const v=+j.profile_patch[k];if(v>0&&v!==ME[k]){ME[k]=v;ch=true;}});if(j.profile_patch.goalText){ME.goalText=String(j.profile_patch.goalText).slice(0,400);ch=true;}if(ch){saveProfiles();done.push('profil');}}
+ if(Array.isArray(j.warnings)&&j.warnings.length){D.ai.warnings={d,items:j.warnings.map(String).slice(0,6)};}else D.ai.warnings=null;
+ D.ai.importedAt=Date.now();save();
+ return done.length?'Importované: '+done.join(', ')+'.':'Dokument bol prázdny – nič sa nezmenilo.';
+}
+function claudeNext(id){const nx=D.ai&&D.ai.next;if(!nx||!nx.ex||!nx.ex[id])return null;return Object.assign({d:nx.d},nx.ex[id]);}
 /* =====================================================================
    CHAT
    ===================================================================== */
