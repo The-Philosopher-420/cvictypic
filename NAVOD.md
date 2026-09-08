@@ -1,30 +1,23 @@
-# CVIČ TY PIČ – návod (verzia 3, GitHub)
+# CVIČ TY PIČ – návod (verzia 4)
 
-**Appka:** https://the-philosopher-420.github.io/cvictypic/
-**Dáta (súkromné):** https://github.com/The-Philosopher-420/cvictypic-data (priečinok `kv/`)
-**Kód appky:** https://github.com/The-Philosopher-420/cvictypic
+**Appka:** https://the-philosopher-420.github.io/cvictypic/ · **Dáta:** github.com/The-Philosopher-420/cvictypic-data (súkromné)
+Prvé otvorenie cez „odkaz pre kamošov“ (avatar → Pokročilé → Server → 🔗) nastaví zdieľaný server sám.
 
-## Ako to funguje
-- Appka je webstránka na GitHub Pages (zadarmo, HTTPS, dá sa pridať na plochu ako appka, fullscreen).
-- Zdieľané dáta (profily, tréningy, jedlo, leaderboard) sú JSON súbory v súkromnom repozitári `cvictypic-data`. Appka do nich zapisuje cez GitHub token, ktorý dostaneš raz v odkaze – uloží sa do telefónu.
-- Každý telefón má aj lokálnu kópiu → appka funguje offline, po pripojení sa dopíše.
-- AI (kredo, hodnotenie, chat, fotky jedla): cez Anthropic API kľúč (v odkaze pre kamošov / nastavenia → AI). Bez kľúča chat otvorí Claude appku s kontextom, kredo ide z banky hlášok.
-- Denný AI sync: appka ho spustí sama pri prvom otvorení v deň (ak je kľúč). Navyše je pripravený `sync.js` v data repozitári – ak sa pridá secret `ANTHROPIC_API_KEY` a workflow, píše kredo každé ráno aj bez otvorenia appky.
+## Vyhodnotenie cez Claude (bez API, bez kľúčov)
+1. Avatar → **📤 Export pre Claude** → Skopírovať (alebo Zdieľať / stiahnuť .md).
+2. Vlož do samostatného chatu s Claude („Cvič ty pič – vyhodnotenie“). Export obsahuje všetky tvoje dáta + hotový prompt.
+3. Claude odpovie krátkym bodovým zhodnotením a JSON blokom.
+4. Avatar → **📥 Import od Claude** → vlož celú odpoveď → Importovať. Appka prestaví: kredo, zhodnotenie, ciele stravy, odporúčané váhy pri každom cviku (✦), odporúčania, program (ak ho Claude zmenil), makrá jedál bez odhadu, mikroživiny, recepty.
+Odporúčam raz týždenne, ideálne po víkende.
 
-## Prvé spustenie (každý)
-1. Otvor **odkaz pre kamošov** (dostaneš od ThePhilosophera – obsahuje prístup k dátam, neposielaj ďalej).
-2. Vyber profil → avatar → **Upraviť profil** (váha, výška, vek, cieľ vlastnými slovami).
-3. Na plochu: Chrome ⋮ → **Pridať na plochu / Inštalovať**; Safari **Zdieľať → Pridať na plochu**.
+## Tréning
+- Karty potiahni doľava (hotovo) / doprava (vynechané). ＋ Aktivita = HIIT, LISS, mobilita, čokoľvek (minúty, intenzita) – počíta sa do kardia a leaderboardu.
+- Meranie: ľubovoľné série, DROP, ☰ poradie, prepis názvu, vlastný cvik, ukladá sa samo. Napovedá **tvoje** posledné váhy a ✦ odporúčanie od Claude. „Presunúť do profilu“ ak si zapísal do zlého profilu.
+- Program: v tréningu ✏️ Upraviť = poradie, názvy, série, DROP, pridať/odobrať cvik, „Pôvodný“, „Prevziať od kamoša“. Platí len pre tvoj profil.
 
-## Prenos starých dát z Claude verzie
-Stará verzia (Claude artefakt): avatar → **Záloha (JSON)**. Nová appka: avatar → **Obnoviť zo zálohy**. Každý svoj profil.
+## Jedlo
+- ＋ Jedlo → napíš, čo si jedol („150 g kura, 200 g ryža, brokolica“) → **⚡ Odhadnúť z popisu** (offline databáza ~110 potravín na 100 g). Fotka je voliteľná – Claude ju pri exporte doplní (jedlá bez makier majú needs_estimate).
+- Prepínač Deň / 2 dni / Týždeň / 30 dní: makrá vs. ciele a krytie 18 živín (koľko zdrojov denne – EFSA). Ciele počítajú sedavý režim (PC) – nastavíš v profile.
 
-## Odkaz pre kamošov
-Avatar → Server → **🔗 Odkaz pre kamošov**. Skopíruje sa odkaz s nastavením servera (a AI kľúčom, ak je zadaný).
-
-## Aktualizácie appky
-Nový `index.html` nahrať do repozitára `cvictypic` (Add file → Upload files → Commit). Telefóny si novú verziu stiahnu pri ďalšom otvorení. Alebo daj Claudovi krátkodobý token a nahrá to on.
-
-## Bezpečnosť
-- Token v odkaze má prístup **len** k repozitáru `cvictypic-data`. Ak by unikol: GitHub → Settings → Developer settings → Fine-grained tokens → Delete, a vygenerovať nový.
-- Klasický token s prístupom ku všetkým repozitárom (použitý na nasadenie) **zmaž hneď po nasadení**.
+## Zálohy
+Avatar → Pokročilé → Záloha (JSON). Obnoviť = zlúčenie (nič sa neprepíše). Staré dáta z Claude verzie: tam Záloha → tu Obnoviť.
