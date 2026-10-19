@@ -32,8 +32,8 @@ Zdroj pravdy pre záznamy, sync a MD import/export. Verzia schémy: `schema_vers
 - Cvik s prázdnym `sets` = bol v pláne, nevykonal sa. Tréning bez jediného vyplneného cviku sa neukladá (okrem `src: "check"` = odcvičené bez čísel z v4 check-inov).
 - `exercise_id` je kľúč z `EX` v appke alebo `c:<id>` (vlastný cvik, názov v `nm`). Staré id ostávajú čitateľné.
 
-### Aktivita (len história kardia z v4) – `kv/<user_id>/a/<id>.json`
-`{id, schema_version:5, user_id, date, ts, kind:"HIIT"|"LISS"|"MOB"|"OTHER", name, min, int, note, src}` – nové sa nezapisujú.
+### Aktivita (HIIT / LIIT mimo silového plánu) – `kv/<user_id>/a/<id>.json`
+`{id, schema_version:5, user_id, date, ts, kind:"HIIT"|"LIIT", min, km?, start?, end?, note, src:"app", created, updated, dev, deleted?}` – HIIT = minúty + krátky popis, LIIT = kilometre + minúty + popis (`km` chýba, keď je 0). Staré druhy z v4 (`LISS`, `MOB`, `OTHER`, `name`, `int`) ostávajú čitateľné. Sync a náhrobky rovnako ako pri tréningu.
 
 ### Plán – `kv/<user_id>/plan.json`
 `{schema_version:5, user_id, sessions:{UA:[{id,nm,sets,drop,pu,k}],…}, updated, prev?}` – `pu:1` = osobná položka (Apply to all ju nekopíruje). Ak chýba, platí základný plán (`DEF_PLAN` + `CORE.dia`/`CORE.std` podľa `profile.dia`).
@@ -45,7 +45,7 @@ Zdroj pravdy pre záznamy, sync a MD import/export. Verzia schémy: `schema_vers
 `{schema_version:5, user_id, date, state:[…], goals:{mcp:{w,r,note}}, eval, support, imported}`
 
 ### Profily – `kv/profiles.json`
-`{schema_version:5, profiles:[{id, name, dia, goalMonth, created, updated}]}` – `id` sa nikdy nemení.
+`{schema_version:5, profiles:[{id, name, dia, goalMonth, created, updated, best?}]}` – `id` sa nikdy nemení; `best` = rekord v minihre.
 
 ## 2. Sync (GitHub Contents API)
 - Jeden záznam = jeden súbor. PUT vždy s `sha` poslednej známej verzie → server odmietne prepis cudzej zmeny (409/422).
@@ -77,7 +77,9 @@ goal_month: 16
 #### RRRR-MM-DD · UA · Upper A [· hh:mm–hh:mm] [· NN min] [· bez čísel]
 - <cvik_id> · <názov> · 20×10, 22.5×8↓ | —      (— = nevykonané)
 note: …
-### activities (história, mimo plánu)
+### activities
+- RRRR-MM-DD · HIIT · NN min [· hh:mm] [· popis]
+- RRRR-MM-DD · LIIT · N.N km · NN min [· hh:mm] [· popis]
 ### calendar (plán)
 RRRR-MM: DD UA · DD LA
 ### stats
