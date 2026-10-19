@@ -1,8 +1,8 @@
-# CVIČ TY PIČ – návod (verzia 5)
+# CVIČ TY PIČ – návod (verzia 5.2)
 
 **Appka:** https://the-philosopher-420.github.io/cvictypic/ · **Dáta:** github.com/The-Philosopher-420/cvictypic-data (súkromné, priečinok `kv/`)
 
-Prvé otvorenie na novom telefóne: cez „odkaz pre kamošov“ (Nastavenia → 🔗 Odkaz) – nastaví server. Potom vyber, kto cvičí (telefón si to pamätá; každý zápis sa ukladá pod zvoleným používateľom).
+Celá história (všetky tréningy od augusta 2026, zo všetkých starých verzií) je **vstavaná v appke** (`seed.json`) – ukáže sa hneď, aj bez servera a bez internetu. Vyber, kto cvičí (telefón si to pamätá; každý zápis sa ukladá pod zvoleným používateľom). Zdieľanie medzi telefónmi zapne server (nižšie, 1 minúta, bez tokenov).
 
 ## Tréning
 - Ťuk na typ (Upper A / Lower A / Upper B / Lower B) = dnešný zápis. Sivé čísla sú tvoje posledné hodnoty – len napovedajú. Cvik bez čísel = nevykonaný, to je v poriadku.
@@ -26,16 +26,18 @@ Prvé otvorenie na novom telefóne: cez „odkaz pre kamošov“ (Nastavenia →
 2. Nový chat: vlož `prompts/chat-prompt.md` + export. Claude vráti import-MD a 3–6 bodov.
 3. Nastavenia → **Import odpovede (MD)** → vlož → Importovať. Neplatný súbor appka odmietne s dôvodom. Aktualizuje sa len používateľ zo súboru.
 
-## Server (bez neho sa nič nezdieľa)
-- Appka potrebuje v každom prehliadači/ikone jednorazovo nastaviť server (GitHub token k repozitáru `cvictypic-data`). Najjednoduchšie: na zariadení, kde server funguje, Nastavenia → **🔗 Odkaz** → odkaz otvor na novom zariadení (alebo ho vlož do poľa token v Nastavenia → Server). Pozor: iPhone ikona na ploche má vlastné úložisko oddelené od Safari – odkaz treba otvoriť priamo v nej.
-- Ak odkaz nikto nemá: GitHub → Settings → Developer settings → Fine-grained tokens → repozitár `cvictypic-data`, Contents: Read and write → token vlož do Nastavenia → Server. Token nikdy nedávaj do súborov ani chatov.
-- Nastavenia → Diagnostika ukáže, či sú v tomto prehliadači staré v4 dáta a koľko záznamov je načítaných.
+## Server (zdieľanie medzi telefónmi)
+- **Google server – bez tokenov.** Kód je v `tools/server/Code.gs` a je už vložený v projekte na script.google.com (účet Xaviera). Zapnutie raz: script.google.com → projekt so skriptom → **Deploy → New deployment** → ⚙️ typ **Web app** → Execute as **Me**, Who has access **Anyone** → **Deploy** → skopíruj **Web app URL** (končí `/exec`) → v appke Nastavenia → Server → vlož → **Uložiť a otestovať**. Appka nahrá vstavanú históriu na server a odvtedy sa všetko zdieľa.
+- Ostatné telefóny: Nastavenia → **🔗 Odkaz** (obsahuje adresu servera) → otvoriť na druhom telefóne (alebo adresu vložiť do Nastavenia → Server). Pozor: iPhone ikona na ploche má vlastné úložisko oddelené od Safari – odkaz treba otvoriť priamo v nej.
+- Zmena kódu servera: v editore skriptu uprav kód → Deploy → **Manage deployments** → ✏️ → Version: New version → Deploy (adresa ostáva). Dáta sú v Script Properties (gzip), limit ~500 kB ≈ niekoľko rokov tréningov; appka má zálohu JSON.
+- GitHub repozitár s tokenom ostáva ako voliteľná alternatíva (Nastavenia → Server → GitHub).
+- Nastavenia → Diagnostika ukáže verziu, server, počty záznamov a či sú v tomto prehliadači staré v4 dáta.
 
 ## Sync a zálohy
-- Bodka pri mene: zelená = synchronizované, oranžová = prebieha, červená = server neodpovedá (zapisuje sa do telefónu, pošle sa neskôr), sivá = bez servera.
+- Bodka pri mene: zelená = synchronizované, oranžová = prebieha, sivá = bez servera alebo server práve neodpovedá (zapisuje sa do telefónu, pošle sa neskôr; detail v Nastaveniach). Nič nebliká na červeno.
 - Konflikt (dve zariadenia zmenili ten istý zápis) sa nikdy neprepíše: obe verzie ostanú, označené „konflikt“ v Nastaveniach – otvor a zmaž tú zlú.
-- Zmazané zápisy ostávajú na serveri ako zmazané. Denná záloha: GitHub Action v cvictypic-data (`backups/`). Ručne: Nastavenia → Záloha JSON; Obnoviť = zlúčenie.
+- Zmazané zápisy ostávajú na serveri ako zmazané. Ručne: Nastavenia → Záloha JSON; Obnoviť = zlúčenie. (Pri GitHub serveri navyše denná záloha Action do `backups/`.)
 
 ## Pre vývoj
-- `index.html` je celá appka; `tools/legacy.js` = prevod v1–v4 dát (zdieľa ho appka aj `tools/migrate.js`); `docs/SCHEMA.md` = schéma záznamov a MD formátov.
+- `index.html` je celá appka; `seed.json` = vstavaná história (doplní sa raz podľa `SEED_VER`, len chýbajúce záznamy); `tools/legacy.js` = prevod v1–v4 dát; `tools/server/Code.gs` = Google server; `docs/SCHEMA.md` = schéma záznamov, MD formátov a API servera.
 - Po zmene: `node --check`, test v prehliadači, commit do `main` → GitHub Pages. Pri zmene `sw.js` zvýš názov cache.
