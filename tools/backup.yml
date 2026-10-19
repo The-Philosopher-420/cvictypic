@@ -1,0 +1,32 @@
+# Denná záloha dát – patrí do repozitára cvictypic-data ako .github/workflows/backup.yml
+# Každý deň o 03:17 UTC (a ručne) zloží všetky súbory z kv/ do jedného JSON v backups/<dátum>.json a commitne.
+# Git história repozitára je navyše kompletný audit každého zápisu.
+name: backup
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zlož zálohu
+        run: |
+          node -e '
+          const fs=require("fs"),path=require("path");
+          const out={created:new Date().toISOString(),files:{}};
+          (function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);if(fs.statSync(p).isDirectory())walk(p);else if(p.endsWith(".json")){try{out.files[p]=JSON.parse(fs.readFileSync(p,"utf8"));}catch(e){out.files[p]={_raw:fs.readFileSync(p,"utf8")};}}}})("kv");
+          fs.mkdirSync("backups",{recursive:true});
+          const name="backups/"+new Date().toISOString().slice(0,10)+".json";
+          fs.writeFileSync(name,JSON.stringify(out,null,1));
+          console.log(name,Object.keys(out.files).length,"súborov");'
+      - name: Commit
+        run: |
+          git config user.name "ctp-backup"
+          git config user.email "ctp-backup@users.noreply.github.com"
+          git add backups
+          git diff --cached --quiet || git commit -m "backup $(date -u +%F)"
+          git push
