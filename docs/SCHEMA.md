@@ -47,7 +47,11 @@ Zdroj pravdy pre záznamy, sync a MD import/export. Verzia schémy: `schema_vers
 ### Profily – `kv/profiles.json`
 `{schema_version:5, profiles:[{id, name, dia, goalMonth, created, updated, best?}]}` – `id` sa nikdy nemení; `best` = rekord v minihre.
 
-## 2. Sync (GitHub Contents API)
+## 2. Sync (KV server: Google Apps Script alebo GitHub Contents API)
+Appka pracuje nad jednotným KV API (`ghGet/ghList/ghPut/ghGetMany`), cesta = `kv/...` ako v repozitári. Dva servery:
+- **Google server** (`tools/server/Code.gs`, web app „Anyone“, bez tokenov; adresa v `localStorage ctp:server.gas.url`, odkaz pre kamošov `#srv=<url>`): `POST <url>` s telom `text/plain` JSON `{key:'ctp-2026', op, ...}` → JSON. Operácie: `ping` → `{ok}`; `list{dir}` → `{files:[{name,sha}]}`; `get{path}` → `{sha,text}` | `{missing:true}`; `getmany{paths[]}` → `{items:{path:{sha,text}}}`; `put{path,text,sha?}` → `{sha}` | `{conflict:true}` (rovnaká CAS logika ako GitHub: iná sha / existujúci súbor bez sha = konflikt); `bulk{files:[{path,text}],force?}`; `count`. Úložisko: Script Properties, JSON mapy `{path:{s:sha1,t:text,u:ms}}` gzip+base64 po 8000 znakoch (limit ~500 kB).
+- **GitHub** (`ctp:server.gh = {owner,repo,token}`, odkaz `#gh=owner/repo&t=token`): Contents API, sha z gitu. Ak sú nastavené oba, používa sa GitHub.
+- **Vstavaná história** `seed.json` (`{ver, profiles, users:{<id>:{w:{id:rec}, a:{id:rec}}}}`): pri prvom spustení (podľa `SEED_VER`) sa doplnia chýbajúce záznamy ako `_legacy` → so serverom sa zladia rovnako ako migrácia starého telefónu (nižšie); bez servera sú história hneď.
 - Jeden záznam = jeden súbor. PUT vždy s `sha` poslednej známej verzie → server odmietne prepis cudzej zmeny (409/422).
 - Pri odmietnutí: ak je obsah rovnaký (série, dátum, poznámka – líšia sa len metadáta `updated/created/dev/src/srcs/flag`) → prevezme sa serverová verzia a sha; inak serverová verzia ostáva pod pôvodným id a lokálna sa uloží ako `<id>~k####.json` s `conflict_of` – **obe verzie ostávajú, označené**.
 - Pull: zoznam adresára → stiahnu sa len súbory s inou sha. Lokálne `_sha`, `_dirty`, `_legacy` sa na server nikdy nezapisujú.
