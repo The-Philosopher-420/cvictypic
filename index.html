@@ -160,11 +160,35 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
 .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pcard{background:var(--card);border:1px solid var(--line2);border-radius:var(--r);padding:18px 10px;text-align:center;font-weight:800;font-size:16px;cursor:pointer}
 .ok-text{color:var(--mint)}.err-text{color:var(--rose)}
+/* logo v hlavičke (3 ťuky = minihra) */
+.logo{width:34px;height:34px;border-radius:10px;object-fit:cover;background:var(--card2);flex:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+/* aktivity HIIT / LIIT */
+.actgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.actgrid button{border:1px solid var(--line2);background:var(--card2);border-radius:var(--r);padding:10px 8px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800;font-size:13px;min-height:50px}
+.actgrid button span{font-size:11px;color:var(--mute);font-weight:600}
+.pic.H{background:var(--rose-s);color:var(--rose)}.pic.L{background:var(--amber-s);color:var(--amber)}
+.m.done.H{background:var(--rose);color:#2a0b12}.m.done.L{background:var(--amber);color:#2a1a00}
+.stepper{display:grid;grid-template-columns:44px 1fr 44px;gap:6px;align-items:center}
+.stepper button{height:44px;border:1px solid var(--line2);background:var(--card2);border-radius:var(--r2);font-weight:900;font-size:20px}
+.stepper input{text-align:center;font-weight:800;font-size:18px}
+/* minihra · Matej beží */
+#game{position:fixed;inset:0;z-index:90;background:#0E1114;display:none;flex-direction:column}
+#game.on{display:flex}
+#gc{flex:1;width:100%;height:100%;display:block;touch-action:none}
+.gover{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(14,17,20,.86);padding:20px;text-align:center}
+.gover h2{font-size:26px}
+.gover .sc{font:900 54px/1 system-ui;color:var(--blue)}
+.gtop{position:absolute;top:calc(10px + var(--sat));left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;z-index:3}
+.gtop .btn{pointer-events:auto}
+.gsc{font:900 26px system-ui}
+.glb{width:100%;max-width:340px;text-align:left}
+.glb div{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
 </style>
 </head>
 <body>
 <div id="app">
   <header class="top"><div class="in">
+    <img class="logo" id="logo" src="icon-192.png" alt="Matej" draggable="false">
     <div class="brand grow">CVIČ TY <em>PIČ</em></div>
     <button class="ubtn" id="hUser" aria-label="Používateľ a nastavenia"><span class="dot" id="syncDot"></span><span id="hName">…</span></button>
   </div></header>
@@ -199,6 +223,15 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
 <div class="sheet full" id="shText"><div class="bd"></div>
   <div class="pan"><div class="grab"></div><div class="shead"><h2 id="textTitle">Export</h2><button class="x" data-close="shText">✕</button></div><div id="textBody"></div></div>
 </div>
+<div class="sheet" id="shAct"><div class="bd" id="actBd"></div>
+  <div class="pan"><div class="grab"></div><div class="shead"><h2 id="actTitle">Aktivita</h2><button class="x" id="actClose">✕</button></div><div id="actBody"></div></div>
+</div>
+<div id="game">
+  <canvas id="gc"></canvas>
+  <div class="gtop"><div class="gsc" id="gsc">0</div><button class="btn sm" id="gclose">✕ Zavrieť</button></div>
+  <div class="gover" id="gover" hidden></div>
+</div>
+<img id="sticker" src="sticker.png" alt="" hidden>
 <div class="sheet" id="shProfile"><div class="bd" data-close="shProfile"></div>
   <div class="pan"><div class="grab"></div><div class="shead"><h2 id="profTitle">Profil</h2><button class="x" data-close="shProfile">✕</button></div><div id="profBody"></div></div>
 </div>
@@ -209,7 +242,9 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
    CVIČ TY PIČ v5 · zápis a tracking tréningov · 1 súbor, bez API
    Schéma záznamov: SCHEMA=5 (pozri NAVOD.md / docs/SCHEMA.md)
    ===================================================================== */
-const APP_VERSION='5.0.0';
+const APP_VERSION='5.1.0';
+/* aktivity mimo silového plánu: HIIT (minúty) a LIIT (kilometre + minúty); staré druhy z v4 ostávajú čitateľné */
+const ACT_META={HIIT:{n:'HIIT',sub:'intervaly · minúty',pic:'H'},LIIT:{n:'LIIT',sub:'km + minúty',pic:'L'},LISS:{n:'LISS',sub:'',pic:'L'},MOB:{n:'Mobilita',sub:'',pic:'K'},OTHER:{n:'Iné',sub:'',pic:'K'}};
 const SCHEMA=5;
 const SES=['UA','LA','UB','LB'];
 const SES_META={UA:{n:'Upper A',sub:'hruď + ramená',pic:'UA',grp:'upper'},LA:{n:'Lower A',sub:'kvadricepsy + lýtka',pic:'LA',grp:'lower'},UB:{n:'Upper B',sub:'chrbát + ruky',pic:'UB',grp:'upper'},LB:{n:'Lower B',sub:'hip thrust + zadný reťazec',pic:'LB',grp:'lower'},K:{n:'Kardio / iné',sub:'',pic:'K',grp:''},X:{n:'Iný tréning',sub:'',pic:'X',grp:''}};
@@ -288,6 +323,7 @@ const deepEq=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
 function canon(v){if(Array.isArray(v))return v.map(canon);if(v&&typeof v==='object'){const o={};Object.keys(v).filter(k=>!k.startsWith('_')).sort().forEach(k=>{if(v[k]!==undefined)o[k]=canon(v[k]);});return o;}return v;}
 const stable=v=>JSON.stringify(canon(v),null,1);
 let toastT=null;
+function buzz(p){try{navigator.vibrate&&navigator.vibrate(p||12);}catch(e){}}
 function toast(t,ms=2000){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),ms);}
 function openSheet(id){$(id).classList.add('on');}
 function closeSheet(id){$(id).classList.remove('on');}
@@ -331,7 +367,7 @@ function validateWorkout(w){
  else w.entries.forEach((e,i)=>{if(!e||typeof e!=='object'){err.push('entry '+i+' nie je objekt');return;}if(!e.exercise_id||typeof e.exercise_id!=='string')err.push('entry '+i+': chýba exercise_id');if(e.user_id!==w.user_id)err.push('entry '+i+': user_id nesedí');if(!Array.isArray(e.sets))err.push('entry '+i+': chýbajú sets');else e.sets.forEach((s,j)=>{if(typeof s.w!=='number'||typeof s.r!=='number'||isNaN(s.w)||isNaN(s.r)||s.w<0||s.r<0)err.push('entry '+i+' séria '+(j+1)+': w/r musia byť čísla ≥ 0');});});
  return err;
 }
-function validateActivity(a){const err=[];if(!a||!a.id)err.push('chýba id');if(a.schema_version!==SCHEMA)err.push('zlá schema_version');if(!a.user_id||!profile(a.user_id))err.push('chýba user_id');if(!DATE_RE.test(a.date||''))err.push('chýba dátum');if(!a.ts)err.push('chýba timestamp');return err;}
+function validateActivity(a){const err=[];if(!a||!a.id)err.push('chýba id');if(a.schema_version!==SCHEMA)err.push('zlá schema_version');if(!a.user_id||!profile(a.user_id))err.push('chýba user_id');if(!DATE_RE.test(a.date||''))err.push('chýba dátum');if(!a.ts||!DT_RE.test(a.ts))err.push('chýba timestamp');if(!a.kind||typeof a.kind!=='string')err.push('chýba druh');if(a.min!=null&&(typeof a.min!=='number'||isNaN(a.min)||a.min<0))err.push('minúty musia byť číslo ≥ 0');if(a.km!=null&&(typeof a.km!=='number'||isNaN(a.km)||a.km<0))err.push('km musia byť číslo ≥ 0');if(a.start&&!DT_RE.test(a.start))err.push('zlý start');if(a.end&&!DT_RE.test(a.end))err.push('zlý end');return err;}
 const validSets=e=>(e.sets||[]).filter(s=>(+s.r||0)>0||(+s.w||0)>0);
 const doneEntries=w=>(w.entries||[]).filter(e=>validSets(e).length);
 const isDone=w=>!w.deleted&&(doneEntries(w).length>0||w.src==='check');
@@ -566,27 +602,76 @@ function renderTrain(){
  const planned=(((DB.cal[u]||{})[t.slice(0,7)]||{}).days||{})[t]||'';
  const ai=DB.ai[u];
  sec.innerHTML=`
+ ${!SRV.gh?`<div class="banner">⚠️ Server nie je nastavený – zápisy ostávajú len v tomto telefóne a história zo servera sa nestiahne. ${hasLegacyLocal()?'Staré dáta z tohto telefónu sú načítané.':'V tomto prehliadači nie sú ani staré dáta – otvor appku v prehliadači/ikone, kde si ju používal doteraz.'} <a href="#" data-gotoset>Nastaviť server</a></div>`:''}
  <div class="card">
   <div class="row mb"><h2 class="grow">Dnes · ${fmtD(t)}</h2>${planned?`<span class="badge blue">plán: ${planned}</span>`:''}</div>
   <div class="sesgrid">${SES.map(k=>`<button data-new="${k}" class="${planned===k?'today':''}"><span class="pic ${k}">${k}</span>${esc(SES_META[k].n)}<span>${esc(SES_META[k].sub)}</span></button>`).join('')}</div>
+  <div class="actgrid"><button data-newact="HIIT"><span class="pic H">H</span>HIIT<span>minúty</span></button><button data-newact="LIIT"><span class="pic L">L</span>LIIT<span>km + minúty</span></button></div>
   ${todays.length?`<div class="small mute mt">Dnes už zapísané: ${todays.map(w=>`<a href="#" data-open="${w.id}">${w.session} ${fmtT(w.start)||''}</a>`).join(', ')} – ťuk na typ otvorí dnešný zápis.</div>`:''}
  </div>
  ${ai?`<div class="card"><div class="row"><h3 class="grow">✦ Claude · ${fmtD(ai.date)}</h3></div>${(ai.state||[]).length?`<div class="aibox"><b>Stav</b><br>${ai.state.map(esc).join('<br>')}</div>`:''}${ai.eval?`<div class="aibox"><b>Hodnotenie</b><br>${esc(ai.eval)}</div>`:''}${ai.support?`<div class="aibox"><b>Podpora</b><br>${esc(ai.support)}</div>`:''}${ai.goals&&Object.keys(ai.goals).length?`<div class="tiny mute">Ciele pri cvikoch sa zobrazujú v zápise (✦).</div>`:''}</div>`:''}
- <div class="card"><div class="row mb"><h2 class="grow">História</h2><span class="small mute">${visibleWorkouts(u).filter(isDone).length} tréningov</span></div><div id="histList">${histHTML(u)}</div></div>`;
+ <div class="card"><div class="row mb"><h2 class="grow">História</h2><span class="small mute">${visibleWorkouts(u).filter(isDone).length} tréningov · ${Object.values(DB.a[u]||{}).filter(a=>!a.deleted).length} aktivít</span></div><div id="histList">${histHTML(u)}</div></div>`;
  sec.querySelectorAll('[data-new]').forEach(b=>b.onclick=()=>openLog({session:b.dataset.new}));
+ sec.querySelectorAll('[data-newact]').forEach(b=>b.onclick=()=>openAct({kind:b.dataset.newact}));
  sec.querySelectorAll('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();openLog({id:a.dataset.open});});
+ const gs=sec.querySelector('[data-gotoset]');if(gs)gs.onclick=e=>{e.preventDefault();showTab('set');};
  bindHist(sec);
 }
+function hasLegacyLocal(){return PROFILES.some(p=>{const d=LS.get('ctp:d:'+p.id);return d&&((d.logs||[]).length||Object.keys(d.checks||{}).length);});}
 function histHTML(u,limit=60){
  const rows=[...visibleWorkouts(u).map(w=>({t:'w',d:w.date,k:w.ts||'',o:w})),...Object.values(DB.a[u]||{}).filter(a=>!a.deleted).map(a=>({t:'a',d:a.date,k:a.ts||'',o:a}))].sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:a.k<b.k?1:-1).slice(0,limit);
  if(!rows.length)return '<div class="empty">Zatiaľ nič. Ťukni na typ tréningu hore a zapíš prvé čísla.</div>';
  return rows.map(r=>{
-  if(r.t==='a'){const a=r.o;return `<div class="hist" data-act="${a.id}"><span class="pic K">${esc((a.kind||'K').slice(0,4))}</span><div class="grow"><b>${esc(a.name||a.kind||'Aktivita')}</b> · ${fmtDY(a.date)}<div class="small mute">${a.min?a.min+' min':''}${a.note?' · '+esc(a.note):''} <span class="badge grey">história</span></div></div></div>`;}
+  if(r.t==='a'){const a=r.o;const m=ACT_META[a.kind]||ACT_META.OTHER;return `<div class="hist" data-act="${a.id}"><span class="pic ${m.pic}">${esc(m.pic==='K'?(a.kind||'K').slice(0,4):m.pic)}</span><div class="grow"><b>${esc(m.n)}${a.name?' · '+esc(a.name):''}</b> · ${fmtDY(a.date)}${a.start?' '+fmtT(a.start):''}<div class="small mute">${actSummary(a)}${a.note?' · '+esc(a.note):''}${a._dirty?' <span class="badge grey">čaká na sync</span>':''}</div></div><span class="mute">›</span></div>`;}
   const w=r.o;const n=doneEntries(w).length;const dur=minutes(w.start,w.end);
   return `<div class="hist" data-log="${w.id}"><span class="pic ${SES_META[w.session]?w.session:'X'}">${esc(w.session)}</span><div class="grow"><b>${esc((SES_META[w.session]||{}).n||w.session)}</b> · ${fmtDY(w.date)}${w.start?' '+fmtT(w.start):''}<div class="small mute">${w.src==='check'?'odcvičené bez čísel':n+' cvikov'}${dur?' · '+dur+' min':''}${w.note?' · '+esc(w.note):''} ${w.conflict_of?'<span class="badge">konflikt</span>':''}${w.flag?'<span class="badge">'+esc(w.flag.type||'na rozhodnutie')+'</span>':''}${w._dirty?'<span class="badge grey">čaká na sync</span>':''}</div></div><span class="mute">›</span></div>`;}).join('');
 }
 function bindHist(root){root.querySelectorAll('[data-log]').forEach(b=>b.onclick=()=>openLog({id:b.dataset.log}));root.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>openActivity(b.dataset.act));}
-function openActivity(id){const a=(DB.a[ME.id]||{})[id];if(!a)return;$('dayTitle').textContent='Aktivita (história)';$('dayBody').innerHTML=`<p>${esc(a.name||a.kind)} · ${fmtDY(a.date)} · ${a.min||0} min${a.note?'<br>'+esc(a.note):''}</p><p class="tiny mute">Kardio/aktivity sa v novej verzii už nezapisujú – toto je zachovaná história.</p>`;openSheet('shDay');}
+function openActivity(id){openAct({id});}
+function actSummary(a){const p=[];if(a.km)p.push((+a.km).toLocaleString('sk')+' km');if(a.min)p.push(a.min+' min');if(a.km&&a.min)p.push((a.min/a.km).toFixed(1).replace('.',',')+' min/km');return p.join(' · ')||'—';}
+
+/* =====================================================================
+   AKTIVITY · HIIT (minúty + popis) · LIIT (km + minúty + popis) · záznam = kv/<user>/a/<id>.json
+   ===================================================================== */
+let ACT=null;
+function newAct(u,kind,date){return {id:uid(),schema_version:SCHEMA,user_id:u,date,ts:nowLocal(),kind,name:'',min:kind==='HIIT'?20:30,km:kind==='LIIT'?3:0,int:'',note:'',start:'',end:'',src:'app',created:Date.now(),updated:Date.now(),dev};}
+function openAct(opt){
+ const u=ME.id;let a=null;
+ if(opt.id)a=DB.a[u][opt.id];else a=newAct(u,opt.kind||'HIIT',opt.date||today());
+ if(!a)return;ACT=JSON.parse(JSON.stringify(stripLocal(a)));ACT._exists=!!(opt.id&&DB.a[u][opt.id]);
+ if(!ACT_META[ACT.kind])ACT.kind='OTHER';
+ renderActEditor();openSheet('shAct');
+}
+function renderActEditor(){
+ const u=ME.id;const body=$('actBody');const m=ACT_META[ACT.kind]||ACT_META.OTHER;const liit=ACT.kind!=='HIIT';
+ $('actTitle').textContent=m.n;
+ const step=(id,val,stp,unit)=>`<div class="stepper"><button data-dec="${id}">−</button><input type="number" inputmode="decimal" step="${stp}" min="0" id="${id}" value="${val||''}" placeholder="0"><button data-inc="${id}">＋</button></div><div class="tiny mute center" style="margin-top:2px">${unit}</div>`;
+ body.innerHTML=`
+ <div class="seg" id="actKind">${['HIIT','LIIT'].map(k=>`<button data-v="${k}" aria-pressed="${ACT.kind===k}">${k}</button>`).join('')}${['HIIT','LIIT'].includes(ACT.kind)?'':`<button data-v="${esc(ACT.kind)}" aria-pressed="true">${esc(m.n)}</button>`}</div>
+ <div class="fieldrow"><div><label class="lbl">Dátum</label><input type="date" id="actDate" value="${ACT.date}"></div><div><label class="lbl">Začiatok</label><div class="row" style="gap:6px"><input type="time" id="actStart" value="${fmtT(ACT.start)}"><button class="btn now" id="actStartNow">teraz</button></div></div></div>
+ <div class="fieldrow"><div><label class="lbl">Minúty</label>${step('actMin',ACT.min,1,'min')}</div><div>${liit?`<label class="lbl">Kilometre</label>${step('actKm',ACT.km,0.1,'km')}`:`<label class="lbl">Koniec</label><div class="row" style="gap:6px"><input type="time" id="actEnd" value="${fmtT(ACT.end)}"><button class="btn now" id="actEndNow">teraz</button></div>`}</div></div>
+ ${liit?`<label class="lbl">Koniec</label><div class="row" style="gap:6px"><input type="time" id="actEnd" value="${fmtT(ACT.end)}"><button class="btn now" id="actEndNow">teraz</button></div>`:''}
+ <label class="lbl">Krátky popis</label><input id="actNote" maxlength="120" value="${esc(ACT.note||'')}" placeholder="${liit?'napr. svižná chôdza, les':'napr. 8× 30 s šprint / 90 s chôdza'}">
+ <div class="row" style="margin-top:14px;gap:8px"><button class="btn pri grow" id="actDone">Hotovo</button>${ACT._exists?'<button class="btn danger" id="actDel">🗑️</button>':''}</div>`;
+ $('actKind').addEventListener('seg',e=>{ACT.kind=e.detail;if(ACT.kind==='HIIT')ACT.km=0;renderActEditor();});
+ $('actDate').onchange=e=>{if(DATE_RE.test(e.target.value)){ACT.date=e.target.value;if(ACT.start)ACT.start=ACT.date+'T'+fmtT(ACT.start);if(ACT.end)ACT.end=ACT.date+'T'+fmtT(ACT.end);}};
+ const setT=(k,v)=>{ACT[k]=v?ACT.date+'T'+v:'';if(k==='end'&&ACT.start&&ACT.end){const mi=minutes(ACT.start,ACT.end);if(mi)ACT.min=mi;}renderActEditor();};
+ $('actStart').onchange=e=>setT('start',e.target.value);$('actStartNow').onclick=()=>setT('start',nowLocal().slice(11,16));
+ const en=$('actEnd');if(en){en.onchange=e=>setT('end',e.target.value);$('actEndNow').onclick=()=>setT('end',nowLocal().slice(11,16));}
+ const num=(id,k)=>{const el=$(id);if(!el)return;el.oninput=()=>{ACT[k]=Math.max(0,parseFloat(String(el.value).replace(',','.'))||0);};};
+ num('actMin','min');num('actKm','km');
+ body.querySelectorAll('[data-dec],[data-inc]').forEach(b=>b.onclick=()=>{const id=b.dataset.dec||b.dataset.inc;const k=id==='actMin'?'min':'km';const st=k==='min'?(ACT.kind==='HIIT'?1:5):0.5;let v=(+ACT[k]||0)+(b.dataset.inc?st:-st);v=Math.max(0,Math.round(v*10)/10);ACT[k]=v;$(id).value=v||'';buzz(6);});
+ $('actNote').oninput=e=>{ACT.note=e.target.value;};
+ $('actDone').onclick=()=>{if(!(+ACT.min||0)&&!(+ACT.km||0)){toast('Zadaj minúty alebo km');return;}saveAct();closeSheet('shAct');renderCurrent();toast('Aktivita uložená ✓');};
+ $('actClose').onclick=()=>{closeSheet('shAct');};$('actBd').onclick=()=>closeSheet('shAct');
+ const del=$('actDel');if(del)del.onclick=async()=>{if(await ask('Zmazať túto aktivitu? (na serveri ostane ako zmazaná)',{ok:'Zmazať',danger:true})){const ex=DB.a[u][ACT.id];if(ex){if(ex._sha){ex.deleted=true;markDirty(ex);}else delete DB.a[u][ACT.id];persist(u);scheduleSync();}closeSheet('shAct');renderCurrent();toast('Zmazané');}};
+}
+function saveAct(){
+ const u=ME.id;const o=JSON.parse(JSON.stringify(ACT));delete o._exists;
+ o.min=Math.round((+o.min||0)*10)/10;o.km=Math.round((+o.km||0)*10)/10;if(!o.km)delete o.km;o.ts=o.start||(o.ts&&String(o.ts).startsWith(o.date)?o.ts:o.date+(o.date===today()?'T'+nowLocal().slice(11,16):'T00:00'));o.updated=Date.now();o.dev=dev;o.user_id=u;o.schema_version=SCHEMA;
+ const errs=validateActivity(o);if(errs.length){toast('✗ '+errs[0]);return false;}
+ DB.a[u][o.id]=Object.assign(DB.a[u][o.id]||{},o,{_dirty:true});persist(u);scheduleSync();return true;
+}
 
 /* =====================================================================
    ZÁPIS MERANÍ · sivé = posledná hodnota DANÉHO používateľa · prázdne = nevykonané
@@ -728,12 +813,12 @@ function renderCal(){
  const first=new Date(y,mo-1,1);const start=(first.getDay()+6)%7;const dim=new Date(y,mo,0).getDate();const prevDim=new Date(y,mo-1,0).getDate();
  const cells=[];for(let i=0;i<42;i++){const n=i-start+1;let d,other=false;if(n<1){other=true;const pm=new Date(y,mo-2,prevDim+n);d=iso(pm);}else if(n>dim){other=true;d=iso(new Date(y,mo,n-dim));}else d=`${CAL_M}-${pad(n)}`;cells.push({d,other});if(n>dim&&(i+1)%7===0)break;}
  const byDay={};visibleWorkouts(u).forEach(w=>{if(!isDone(w)||w.conflict_of)return;(byDay[w.date]=byDay[w.date]||[]).push(w.session);});
- const actDays={};Object.values(DB.a[u]||{}).forEach(a=>{if(!a.deleted)actDays[a.date]=true;});
+ const actDays={};Object.values(DB.a[u]||{}).forEach(a=>{if(!a.deleted)(actDays[a.date]=actDays[a.date]||[]).push((ACT_META[a.kind]||ACT_META.OTHER).pic);});
  const st=monthStats(u,CAL_M);const t=today();
  sec.innerHTML=`
  <div class="card"><div class="row mb"><button class="btn sm" id="calPrev">‹</button><h2 class="grow center">${['Január','Február','Marec','Apríl','Máj','Jún','Júl','August','September','Október','November','December'][mo-1]} ${y}</h2><button class="btn sm" id="calNext">›</button></div>
-  <div class="cal">${['Po','Ut','St','Št','Pi','So','Ne'].map(x=>`<div class="wd">${x}</div>`).join('')}${cells.map(c=>{const pl=plannedOn(u,c.d);const dn=byDay[c.d]||[];const marks=[];dn.forEach(s=>marks.push(`<span class="m done ${SES_META[s]?s:'X'}">${esc(s.slice(0,2))}</span>`));if(pl&&!dn.includes(pl))marks.push(`<span class="m ${pl}">${pl}</span>`);if(actDays[c.d])marks.push('<span class="m done K">K</span>');return `<div class="day${c.other?' other':''}${c.d===t?' today':''}" data-day="${c.d}"><span class="n">${+c.d.slice(8)}</span><span class="marks">${marks.join('')}</span></div>`;}).join('')}</div>
-  <div class="legend"><span><i style="background:var(--blue)"></i>Upper A</span><span><i style="background:var(--mint)"></i>Lower A</span><span><i style="background:var(--violet)"></i>Upper B</span><span><i style="background:var(--amber)"></i>Lower B</span><span>obrys = plán · plné = odcvičené</span></div>
+  <div class="cal">${['Po','Ut','St','Št','Pi','So','Ne'].map(x=>`<div class="wd">${x}</div>`).join('')}${cells.map(c=>{const pl=plannedOn(u,c.d);const dn=byDay[c.d]||[];const marks=[];dn.forEach(s=>marks.push(`<span class="m done ${SES_META[s]?s:'X'}">${esc(s.slice(0,2))}</span>`));if(pl&&!dn.includes(pl))marks.push(`<span class="m ${pl}">${pl}</span>`);(actDays[c.d]||[]).forEach(p=>marks.push(`<span class="m done ${p}">${p}</span>`));return `<div class="day${c.other?' other':''}${c.d===t?' today':''}" data-day="${c.d}"><span class="n">${+c.d.slice(8)}</span><span class="marks">${marks.join('')}</span></div>`;}).join('')}</div>
+  <div class="legend"><span><i style="background:var(--blue)"></i>Upper A</span><span><i style="background:var(--mint)"></i>Lower A</span><span><i style="background:var(--violet)"></i>Upper B</span><span><i style="background:var(--amber)"></i>Lower B</span><span><i style="background:var(--rose)"></i>H = HIIT</span><span><i style="background:var(--amber)"></i>L = LIIT</span><span>obrys = plán · plné = odcvičené</span></div>
  </div>
  <div class="card"><div class="stats"><div class="stat"><b>${st.pct} %</b><span>mesačný cieľ ${st.done}/${st.goal}</span></div><div class="stat"><b>${st.up} %</b><span>upper</span></div><div class="stat"><b>${st.lo} %</b><span>lower</span></div></div></div>`;
  $('calPrev').onclick=()=>{const d=new Date(y,mo-2,1);CAL_M=iso(d).slice(0,7);renderCal();};
@@ -741,13 +826,16 @@ function renderCal(){
  sec.querySelectorAll('[data-day]').forEach(el=>el.onclick=()=>openDay(el.dataset.day));
 }
 function openDay(d){
- const u=ME.id;const pl=plannedOn(u,d);const ws=visibleWorkouts(u).filter(w=>w.date===d);
+ const u=ME.id;const pl=plannedOn(u,d);const ws=visibleWorkouts(u).filter(w=>w.date===d);const as=Object.values(DB.a[u]||{}).filter(a=>!a.deleted&&a.date===d);
  $('dayTitle').textContent=fmtDY(d);
  $('dayBody').innerHTML=`<label class="lbl">Plán na tento deň</label><div class="seg" id="dayPlan">${SES.map(k=>`<button data-v="${k}" aria-pressed="${pl===k}">${k}</button>`).join('')}<button data-v="" aria-pressed="${!pl}">–</button></div>
  <label class="lbl">Odcvičené</label>${ws.length?ws.map(w=>`<div class="hist" data-log="${w.id}"><span class="pic ${SES_META[w.session]?w.session:'X'}">${esc(w.session)}</span><div class="grow"><b>${esc((SES_META[w.session]||{}).n||w.session)}</b><div class="small mute">${w.src==='check'?'bez čísel':doneEntries(w).length+' cvikov'}${minutes(w.start,w.end)?' · '+minutes(w.start,w.end)+' min':''}${w.conflict_of?' <span class="badge">konflikt</span>':''}</div></div><span class="mute">›</span></div>`).join(''):'<div class="small mute">nič</div>'}
- <div class="row" style="gap:8px;margin-top:14px"><button class="btn pri grow" id="dayNew">＋ Zapísať tréning v tento deň</button></div>`;
+ ${as.map(a=>{const m=ACT_META[a.kind]||ACT_META.OTHER;return `<div class="hist" data-dact="${a.id}"><span class="pic ${m.pic}">${m.pic}</span><div class="grow"><b>${esc(m.n)}</b><div class="small mute">${actSummary(a)}${a.note?' · '+esc(a.note):''}</div></div><span class="mute">›</span></div>`;}).join('')}
+ <div class="row" style="gap:8px;margin-top:14px"><button class="btn pri grow" id="dayNew">＋ Tréning</button><button class="btn grow" id="dayNewAct">＋ HIIT / LIIT</button></div>`;
  $('dayPlan').addEventListener('seg',e=>{const c=monthCal(u,d.slice(0,7));if(e.detail)c.days[d]=e.detail;else delete c.days[d];markDirty(c);persist(u);scheduleSync();renderCal();});
  $('dayBody').querySelectorAll('[data-log]').forEach(b=>b.onclick=()=>{closeSheet('shDay');openLog({id:b.dataset.log});});
+ $('dayBody').querySelectorAll('[data-dact]').forEach(b=>b.onclick=()=>{closeSheet('shDay');openAct({id:b.dataset.dact});});
+ $('dayNewAct').onclick=()=>{closeSheet('shDay');openAct({kind:'HIIT',date:d});};
  $('dayNew').onclick=()=>{closeSheet('shDay');const w=newWorkout(u,pl||'UA',d);LOG=w;LOG._exists=false;LOG.entries.forEach(x=>{if(!x.sets.length)x.sets=[{w:0,r:0,d:0},{w:0,r:0,d:0}];});renderLogEditor();openSheet('shLog');};
  openSheet('shDay');
 }
@@ -767,6 +855,14 @@ function installHTML(){
  if(ios)return '<p class="small" style="margin:0">Safari → tlačidlo <b>Zdieľať</b> (štvorec so šípkou) → <b>Pridať na plochu</b> → Pridať. Otvor appku z plochy (celá obrazovka, offline, dáta ostávajú).</p>';
  return '<p class="small mute" style="margin:0">Android: Chrome → menu ⋮ → <b>Inštalovať aplikáciu</b> / <b>Pridať na plochu</b>. Ak Chrome ponuku neukáže, otvor stránku ešte raz cez odkaz pre kamošov a chvíľu počkaj.</p>';
 }
+const DEF_REPO='The-Philosopher-420/cvictypic-data';
+function diagHTML(){ // čo je v tomto prehliadači – pomáha zistiť, kde ostali staré dáta
+ const rows=[];rows.push('verzia appky '+APP_VERSION+' · zariadenie '+dev+' · '+(isStandalone()?'z plochy':'v prehliadači'));
+ rows.push('server: '+(SRV.gh?'nastavený ('+esc(SRV.gh.owner+'/'+SRV.gh.repo)+')':'nie je'));
+ PROFILES.forEach(p=>{const d=LS.get('ctp:d:'+p.id);const w=Object.values(DB.w[p.id]||{}).filter(x=>!x.deleted).length;const a=Object.values(DB.a[p.id]||{}).filter(x=>!x.deleted).length;rows.push(esc(p.name)+': v5 '+w+' tréningov, '+a+' aktivít · staré v4 dáta v tomto prehliadači: '+(d?((d.logs||[]).length+' logov, '+Object.values(d.checks||{}).reduce((n,b)=>n+Object.values(b).filter(v=>v&&v.s==='done').length,0)+' check-inov'):'žiadne'));});
+ rows.push('<button class="btn sm" id="diagRemigrate">Znova načítať staré v4 dáta z tohto prehliadača</button>');
+ return rows.join('<br>');
+}
 function renderSet(){
  const u=ME.id;const sec=$('tab-set');const p=profile(u);const plan=planFor(u);
  const conflicts=PROFILES.flatMap(x=>Object.values(DB.w[x.id]||{}).filter(w=>w.conflict_of&&!w.deleted).map(w=>({u:x,w})));
@@ -782,8 +878,10 @@ function renderSet(){
   <p class="tiny mute" style="margin:8px 0 0">Export je Markdown s vloženým promptom – vlož ho Claudovi. Odpoveď (MD podľa schémy) importuj; aktualizuje sa len používateľ, ktorý je v súbore.</p>
  </div>
  <div class="card"><h3 class="mb">Server · sync</h3><p class="small mute" style="margin:0 0 8px">Stav: <b>${esc(modeTxt)}</b>${dc?` · <span style="color:var(--amber)">${dc} zmien čaká</span>`:''}</p>
+  ${!SRV.gh?`<div class="banner">Bez servera sa história nestiahne a zápisy ostanú len tu. Najrýchlejšie: na telefóne, kde appka server mala, Nastavenia → 🔗 Odkaz a ten odkaz tu otvor (alebo ho vlož nižšie do poľa token). Inak vlož GitHub token (fine-grained, len repozitár ${esc(DEF_REPO)}, Contents: Read and write).</div>`:''}
   <div class="row" style="gap:8px"><button class="btn grow" id="syncNow">🔄 Synchronizovať</button>${SRV.gh?'<button class="btn" id="srvShare">🔗 Odkaz</button>':''}</div>
-  <details class="acc mt"><summary>Nastavenie servera</summary><div class="body"><label class="lbl">GitHub repozitár s dátami</label><input id="ghRepo" placeholder="vlastník/názov" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:'')}"><label class="lbl">GitHub token</label><input id="ghTok" type="password" placeholder="github_pat_…" value="${esc(SRV.gh?SRV.gh.token:'')}"><button class="btn wide mt" id="srvSave">Uložiť a otestovať</button><div class="small mt" id="srvStatus"></div></div></details>
+  <details class="acc mt"${SRV.gh?'':' open'}><summary>Nastavenie servera</summary><div class="body"><label class="lbl">GitHub repozitár s dátami</label><input id="ghRepo" placeholder="vlastník/názov" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:DEF_REPO)}"><label class="lbl">GitHub token alebo celý odkaz pre kamošov</label><input id="ghTok" type="password" placeholder="github_pat_… alebo https://…#gh=…&t=…" value="${esc(SRV.gh?SRV.gh.token:'')}"><button class="btn wide mt" id="srvSave">Uložiť a otestovať</button><div class="small mt" id="srvStatus"></div></div></details>
+  <details class="acc mt"><summary>Diagnostika tohto zariadenia</summary><div class="body small mute">${diagHTML()}</div></details>
  </div>
  <div class="card"><h3 class="mb">Inštalácia na plochu</h3>${installHTML()}</div>
  <div class="card"><h3 class="mb">Záloha</h3><div class="row" style="gap:8px"><button class="btn grow" id="bkJson">⬇️ Záloha JSON (všetci)</button><button class="btn grow" id="bkRestore">⬆️ Obnoviť / zlúčiť</button></div><input type="file" accept=".json,.md,.txt,application/json,text/plain,text/markdown" id="bkFile" style="position:absolute;opacity:0;width:1px;height:1px;left:-9999px"><p class="tiny mute" style="margin:8px 0 0">Server robí dennú zálohu sám (GitHub Action). Obnova nikdy neprepisuje – pridáva chýbajúce, rozdielne označí ako konflikt.</p></div>
@@ -797,7 +895,10 @@ function renderSet(){
  $('impMd').onclick=()=>openImport();
  $('syncNow').onclick=async()=>{if(!SRV.gh){toast('Najprv nastav server');return;}toast('Synchronizujem…');const r=await syncAll('manual');if(r)toast(`Sync hotový: ↑${r.pushed} ↓${r.pulled}${r.conflicts?' ⚠️'+r.conflicts:''}`);else toast('Sync zlyhal: '+(SRV.lastErr||'offline'),3000);renderSet();};
  const sh=$('srvShare');if(sh)sh.onclick=async()=>{const l=shareLink();try{await navigator.clipboard.writeText(l);toast('Odkaz skopírovaný – obsahuje prístup k dátam, posielaj len kamošom');}catch(e){$('srvStatus').innerHTML='<span class="mono tiny" style="word-break:break-all">'+esc(l)+'</span>';}};
- $('srvSave').onclick=async()=>{const repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim();const st=$('srvStatus');if(!repo||!tok){SRV.gh=null;LS.del(K.server);st.textContent='Server vypnutý – dáta len v telefóne.';setSyncDot();return;}const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}SRV.gh={owner,repo:name,token:tok};LS.set(K.server,{gh:SRV.gh});st.textContent='Testujem…';const ok=await pingServer();setSyncDot();if(!ok){st.innerHTML='<span class="err-text">Server neodpovedá ('+esc(SRV.lastErr)+').</span>';return;}st.innerHTML='<span class="ok-text">✔ Spojené.</span>';await syncAll('setup');renderSet();};
+ $('srvSave').onclick=async()=>{let repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim();const st=$('srvStatus');
+  if(/[#?&]gh=/.test(tok)){try{const q=new URLSearchParams(tok.slice(tok.indexOf('gh=')));const g=q.get('gh');if(g&&q.get('t')){repo=g;tok=q.get('t');}}catch(e){}} /* vložený celý odkaz pre kamošov */
+  if(!repo||!tok){SRV.gh=null;LS.del(K.server);st.textContent='Server vypnutý – dáta len v telefóne.';setSyncDot();return;}const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}SRV.gh={owner,repo:name,token:tok};LS.set(K.server,{gh:SRV.gh});st.textContent='Testujem…';const ok=await pingServer();setSyncDot();if(!ok){st.innerHTML='<span class="err-text">Server neodpovedá ('+esc(SRV.lastErr)+').</span>';return;}st.innerHTML='<span class="ok-text">✔ Spojené.</span>';await syncAll('setup');renderSet();};
+ const rm=$('diagRemigrate');if(rm)rm.onclick=()=>{const meta=LS.get(K.meta)||{};meta.legacy={};LS.set(K.meta,meta);const n=migrateLocalLegacy();toast(n?'Načítané: '+n+' záznamov':'Nič nové – staré dáta tu nie sú alebo už sú načítané',3500);scheduleSync();renderSet();};
  $('bkJson').onclick=()=>downloadText(`cvictypic-zaloha-${today()}.json`,JSON.stringify(backupPayload(),null,1),'application/json');
  $('bkRestore').onclick=()=>$('bkFile').click();
  $('bkFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const txt=await f.text();const r=await importAny(txt);toast(r,3500);renderCurrent();}catch(err){toast('Nepodarilo sa: '+(err.message||err),4000);}};
@@ -865,7 +966,7 @@ function exportMd(ids){
   if(!ws.length)L.push('(žiadne)','');
   ws.forEach(w=>{const dur=minutes(w.start,w.end);L.push(`#### ${w.date} · ${w.session} · ${(SES_META[w.session]||{}).n||w.session}${w.start?' · '+fmtT(w.start)+(w.end?'–'+fmtT(w.end):''):''}${dur?' · '+dur+' min':''}${w.src==='check'?' · bez čísel':''}`);(w.entries||[]).forEach(e=>L.push(`- ${e.exercise_id} · ${exName(e)} · ${fmtSets(e)}`));if(w.note)L.push('note: '+w.note);if(w.flag)L.push('flag: '+(w.flag.type||'')+(w.flag.note?' – '+w.flag.note:''));L.push('');});
   const acts=Object.values(DB.a[u]||{}).filter(a=>!a.deleted).sort((a,b)=>a.date<b.date?-1:1);
-  if(acts.length){L.push('### activities (história, mimo plánu)');acts.forEach(a=>L.push(`- ${a.date} · ${a.kind||'?'}${a.name?' · '+a.name:''}${a.min?' · '+a.min+' min':''}${a.note?' · '+a.note:''}`));L.push('');}
+  if(acts.length){L.push('### activities');acts.forEach(a=>L.push(`- ${a.date} · ${a.kind||'?'}${a.name?' · '+a.name:''}${a.km?' · '+a.km+' km':''}${a.min?' · '+a.min+' min':''}${a.start?' · '+fmtT(a.start):''}${a.note?' · '+a.note:''}`));L.push('');}
   const cal=DB.cal[u]||{};const months=Object.keys(cal).sort();
   L.push('### calendar (plán)');if(!months.length)L.push('(žiadny)');months.forEach(m=>{const days=Object.entries(cal[m].days||{}).sort();if(days.length)L.push(m+': '+days.map(([d,v])=>d.slice(8)+' '+v).join(' · '));});L.push('');
   L.push('### stats');const ms=[...new Set(ws.map(w=>w.date.slice(0,7)))].sort();ms.forEach(m=>{const s=monthStats(u,m);L.push(`${m}: ${s.done}/${s.goal} (${s.pct} %) · upper ${s.up} % · lower ${s.lo} %`);});L.push('');
@@ -929,7 +1030,7 @@ const EXPORT_PROMPT=`Si tréningový analytik pre appku „Cvič ty pič“. Vy�
 Ako čítať dáta
 - „### workouts“: jeden tréning = nadpis „#### dátum · typ · názov · čas · trvanie“; riadky „- cvik_id · názov · série“. Séria = kg×opakovania, „↓“ = dropset, „—“ = cvik bol v pláne, ale nevykonal sa. „bez čísel“ = tréning odcvičený bez zápisu.
 - „### plan“ = aktuálny plán (poradie, série); „osobné“ = položka len pre tohto používateľa.
-- „### calendar“ = naplánované dni; „### stats“ = mesačné % cieľa a pomer upper/lower; „### activities“ = stará história kardia (neanalyzuj).
+- „### calendar“ = naplánované dni; „### stats“ = mesačné % cieľa a pomer upper/lower; „### activities“ = HIIT (minúty) a LIIT (km, minúty) mimo silového plánu – rátaj ich do frekvencie a regenerácie, nie do progresu cvikov.
 
 Čo analyzuj (per user, stručne, s číslami)
 1. Progres: pri hlavných cvikoch zmena záťaže/opakovaní medzi prvým a posledným zápisom (odhad 1RM = kg × (1 + opak/30)).
@@ -956,6 +1057,57 @@ date: RRRR-MM-DD
 
 Zopakuj blok „## user:“ pre každého používateľa v exporte. Žiadny iný text pred ani za blokom.`;
 
+
+/* =====================================================================
+   MINIHRA · Matej beží (3 ťuky na logo) · rekord v profile (synchronizuje sa s profilmi)
+   ===================================================================== */
+const G={on:false,raf:0,best:0};
+let ACTX=null;function beep(f,d=.07,type='square',v=.05){try{ACTX=ACTX||new (window.AudioContext||window.webkitAudioContext)();const o=ACTX.createOscillator(),g=ACTX.createGain();o.type=type;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(ACTX.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,ACTX.currentTime+d);o.stop(ACTX.currentTime+d);}catch(e){}}
+function openGame(){if(!ME){renderPick();openSheet('shPick');return;}G.on=true;$('game').classList.add('on');$('gover').hidden=true;G.best=ME.best||0;G.img=$('sticker');startRun();}
+$('gclose').onclick=()=>{G.on=false;cancelAnimationFrame(G.raf);$('game').classList.remove('on');window.onkeydown=window.onkeyup=null;};
+(()=>{let taps=[];const lg=$('logo');if(!lg)return;lg.addEventListener('click',()=>{const n=Date.now();taps=taps.filter(x=>n-x<900);taps.push(n);if(taps.length>=3){taps=[];buzz(20);openGame();}});})();
+function startRun(){
+ const c=$('gc'),dpr=Math.min(2,devicePixelRatio||1);const W=innerWidth,H=innerHeight;c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';
+ const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
+ const gy=H*.76,px=W*.2;const SH=110,SW=Math.round(SH*131/320);
+ const st={t:0,speed:330,vy:0,py:gy,ground:true,hold:false,obs:[],next:1.2,score:0,shakes:0,dead:false,dist:0,bgx:0,bob:0};
+ $('gover').hidden=true;$('gsc').textContent='0';
+ const jump=()=>{if(st.dead)return;if(st.ground){st.vy=-820;st.ground=false;st.hold=true;beep(620,.06);buzz(6);}};
+ const release=()=>{st.hold=false;if(st.vy<-300)st.vy=-300;};
+ c.onpointerdown=e=>{e.preventDefault();if(st.dead)return;jump();};c.onpointerup=release;c.onpointercancel=release;
+ const key=e=>{if(!G.on)return;if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();if(e.type==='keydown'){if(!e.repeat)jump();}else release();}};
+ window.onkeydown=key;window.onkeyup=key;
+ const spawn=()=>{const r=Math.random();let o;if(r<.38)o={k:'db',w:46,h:24};else if(r<.66)o={k:'kb',w:34,h:40};else if(r<.8)o={k:'rack',w:22,h:64};else o={k:'shake',w:22,h:30,fly:120+Math.random()*60};o.x=W+40;st.obs.push(o);};
+ let last=performance.now();
+ const drawPlayer=()=>{const py=st.py;const bob=st.ground?Math.abs(Math.sin(st.bob))*4:0;const tilt=st.ground?0:-.12;x.save();x.translate(px,py-bob);x.rotate(tilt);if(G.img&&G.img.complete&&G.img.naturalWidth)x.drawImage(G.img,-SW/2,-SH,SW,SH);else{x.fillStyle='#5B8CFF';x.fillRect(-14,-SH,28,SH);}x.restore();x.fillStyle='rgba(0,0,0,.35)';x.beginPath();x.ellipse(px,gy+4,SW*.6,5,0,0,Math.PI*2);x.fill();};
+ const drawObs=o=>{const y=gy;x.lineCap='round';if(o.k==='db'){x.fillStyle='#8B93A1';x.fillRect(o.x+14,y-14,o.w-28,6);x.fillStyle='#3C4652';[o.x+7,o.x+o.w-7].forEach(cx=>{x.beginPath();x.arc(cx,y-12,12,0,Math.PI*2);x.fill();x.strokeStyle='#5B8CFF';x.lineWidth=2;x.beginPath();x.arc(cx,y-12,6,0,Math.PI*2);x.stroke();});}
+  else if(o.k==='kb'){x.fillStyle='#3C4652';x.beginPath();x.arc(o.x+17,y-17,17,0,Math.PI*2);x.fill();x.strokeStyle='#8B93A1';x.lineWidth=5;x.beginPath();x.arc(o.x+17,y-34,9,Math.PI,0);x.stroke();x.fillStyle='#FB7185';x.beginPath();x.arc(o.x+17,y-17,5,0,Math.PI*2);x.fill();}
+  else if(o.k==='rack'){x.fillStyle='#3C4652';x.fillRect(o.x,y-o.h,o.w,o.h);x.fillStyle='#8B93A1';x.fillRect(o.x-12,y-o.h-6,o.w+24,6);x.fillStyle='#5B8CFF';[y-o.h+10,y-o.h+26,y-o.h+42].forEach(yy=>x.fillRect(o.x+4,yy,o.w-8,4));}
+  else{const fy=y-o.fly+Math.sin(st.t*5)*4;x.fillStyle='#34D399';x.beginPath();if(x.roundRect)x.roundRect(o.x,fy-30,22,30,6);else x.rect(o.x,fy-30,22,30);x.fill();x.fillStyle='#F3F4F1';x.fillRect(o.x+6,fy-36,10,6);x.fillStyle='#06281B';x.font='900 9px system-ui';x.textAlign='center';x.fillText('PRO',o.x+11,fy-13);}};
+ const loop=now=>{if(!G.on)return;const dt=Math.min(.033,(now-last)/1000);last=now;
+  if(!st.dead){st.t+=dt;st.speed=Math.min(820,330+st.t*9);st.dist+=st.speed*dt;st.bob+=dt*st.speed/40;st.bgx=(st.bgx+st.speed*dt)%80;
+   if(!st.ground){st.vy+=(st.hold&&st.vy<0?1500:2500)*dt;st.py+=st.vy*dt;if(st.py>=gy){st.py=gy;st.vy=0;st.ground=true;}}
+   st.next-=dt;if(st.next<=0){spawn();st.next=(.8+Math.random()*.9)*(380/st.speed)+.3;}
+   st.obs.forEach(o=>o.x-=st.speed*dt);st.obs=st.obs.filter(o=>o.x>-80);
+   const pb={x:px-SW*.3,y:st.py-SH*.92,w:SW*.6,h:SH*.9};
+   for(const o of st.obs){const ob=o.k==='shake'?{x:o.x,y:gy-o.fly-30,w:22,h:30}:{x:o.x+o.w*.12,y:gy-o.h*.9,w:o.w*.76,h:o.h*.9};
+    if(pb.x<ob.x+ob.w&&pb.x+pb.w>ob.x&&pb.y<ob.y+ob.h&&pb.y+pb.h>ob.y){if(o.k==='shake'){if(!o.got){o.got=true;st.shakes++;beep(900,.08,'triangle');o.x=-999;}}else{st.dead=true;beep(140,.35,'sawtooth',.08);buzz([40,30,80]);setTimeout(()=>gameOver(st),350);}}}
+   st.score=Math.floor(st.dist/12)+st.shakes*10;$('gsc').textContent=st.score;}
+  x.fillStyle='#0E1114';x.fillRect(0,0,W,H);
+  x.fillStyle='#12161B';x.fillRect(0,gy,W,H-gy);x.strokeStyle='#262D36';x.lineWidth=2;x.beginPath();x.moveTo(0,gy);x.lineTo(W,gy);x.stroke();
+  x.fillStyle='#1F252C';for(let i=-1;i<W/80+1;i++)x.fillRect(i*80-st.bgx,gy+18,40,4);
+  x.strokeStyle='#1A2028';x.lineWidth=6;for(let i=0;i<4;i++){const rx=((i*W/3-st.dist*.25)%(W+200)+W+200)%(W+200)-100;x.beginPath();x.moveTo(rx,gy);x.lineTo(rx,gy-H*.42);x.moveTo(rx-30,gy-H*.42);x.lineTo(rx+30,gy-H*.42);x.stroke();}
+  st.obs.forEach(drawObs);drawPlayer();
+  G.raf=requestAnimationFrame(loop);};
+ G.raf=requestAnimationFrame(loop);
+}
+function gameOver(st){
+ if(st.score>(ME.best||0)){ME.best=st.score;ME.updated=Date.now();LS.set(K.profiles,PROFILES);PROF_DIRTY=true;scheduleSync();}G.best=ME.best||0;
+ const lb=PROFILES.filter(p=>p.best).map(p=>({name:p.name,score:p.best})).sort((a,b)=>b.score-a.score).slice(0,5);
+ const o=$('gover');o.hidden=false;
+ o.innerHTML=`<img src="${$('sticker').src}" alt="" style="height:120px;filter:drop-shadow(0 10px 20px rgba(0,0,0,.6));transform:rotate(${st.score>=G.best&&st.score>0?'-6':'6'}deg)"><h2>${st.score>=G.best&&st.score>0?'Nový rekord! 🏆':'Matej spadol.'}</h2><div class="sc">${st.score}</div><div class="small mute">tvoj rekord ${G.best} · ${st.shakes} proteínov</div><div class="glb">${lb.map((e,i)=>`<div><span>${['🥇','🥈','🥉'][i]||(i+1)+'.'} ${esc(e.name)}</span><b>${e.score}</b></div>`).join('')}</div><div class="row" style="gap:8px;margin-top:6px"><button class="btn pri" id="gagain">▶ Znova</button><button class="btn" id="gexit">Zavrieť</button></div><div class="tiny mute" style="margin-top:8px">ťuk = skok · podrž = vyšší skok · zbieraj proteíny</div>`;
+ $('gagain').onclick=()=>startRun();$('gexit').onclick=()=>$('gclose').onclick();
+}
 /* =====================================================================
    ŠTART
    ===================================================================== */
