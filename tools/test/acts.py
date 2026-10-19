@@ -7,16 +7,17 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch()
         ctx = await b.new_context(viewport={'width': 412, 'height': 915}, has_touch=True)
+        await ctx.add_init_script("localStorage.setItem('ctp5:noseed','1')")
         pg = await ctx.new_page()
         errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
-        pg.on('console', lambda m: errs.append('CONSOLE ' + m.text + ' ' + str(m.location.get('url', ''))) if m.type == 'error' and not re.search(r'status of (401|404|409|422)', m.text) else None)
+        pg.on('console', lambda m: errs.append('CONSOLE ' + m.text + ' ' + str(m.location.get('url', ''))) if m.type == 'error' and not re.search(r'status of (401|404|409|422)', m.text) and 'script.google.com' not in (m.text + str(m.location.get('url', ''))) else None)
         res404 = []
         pg.on('response', lambda r: res404.append(r.url) if r.status == 404 and '127.0.0.1' in r.url else None)
         await pg.goto(URL); await pg.wait_for_timeout(400)
         await pg.click('[data-pick="thephilosopher"]'); await pg.wait_for_timeout(300)
-        # bez servera → banner s odkazom do nastavení
-        assert 'Server nie je nastavený' in (await pg.text_content('#tab-train'))
+        # bez servera → v Tréningu žiadny banner ani chyba (ticho), stav je len v Nastaveniach
+        assert 'Server' not in (await pg.text_content('#tab-train')) and (await pg.get_attribute('#syncDot','class')) == 'dot off'
         # HIIT: 20 min predvolené, + stepper, popis
         await pg.click('[data-newact="HIIT"]'); await pg.wait_for_timeout(200)
         assert await pg.is_visible('#shAct') and (await pg.text_content('#actTitle')).strip() == 'HIIT'
@@ -73,8 +74,17 @@ async def main():
         assert await pg.evaluate("Object.keys(DB.a.thephilosopher).length") == 1
         # diagnostika v nastaveniach
         await pg.click('[data-tab="set"]'); await pg.wait_for_timeout(200)
-        s = await pg.text_content('#tab-set'); assert 'Diagnostika' in s and 'staré v4 dáta v tomto prehliadači: žiadne' in s, s
+        s = await pg.text_content('#tab-set'); assert 'Diagnostika' in s and 'staré v4 dáta v tomto prehliadači: žiadne' in s and 'bez servera' in s and 'script.google.com' in s, s
+        # Google server: zlá adresa → hláška, odkaz pre kamošov #srv= → uloží sa adresa
+        await pg.fill('#gasUrl', 'https://example.com/nie'); await pg.click('#gasSave'); await pg.wait_for_timeout(200)
+        assert 'exec' in (await pg.text_content('#srvStatus')) and not (await pg.evaluate("localStorage.getItem('ctp:server')"))
+        await pg.fill('#gasUrl', 'https://app.x/#srv=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2FABC%2Fexec'); await pg.click('#gasSave'); await pg.wait_for_timeout(1500)
+        cfg = await pg.evaluate("JSON.parse(localStorage.getItem('ctp:server'))"); assert cfg['gas']['url'] == 'https://script.google.com/macros/s/ABC/exec', cfg
+        await pg.click('summary:has-text("Nastavenie servera")'); await pg.wait_for_timeout(200)
+        await pg.fill('#gasUrl', ''); await pg.click('#gasSave'); await pg.wait_for_timeout(300)
+        assert not (await pg.evaluate("localStorage.getItem('ctp:server')"))
         # vloženie celého odkazu pre kamošov do poľa token → repo + token sa rozparsujú (server mock nebeží → „neodpovedá“, ale konfigurácia sa uloží)
+        await pg.click('summary:has-text("GitHub repozitár s tokenom")'); await pg.wait_for_timeout(200)
         await pg.fill('#ghRepo', ''); await pg.fill('#ghTok', 'https://x.y/app/#gh=o%2Fr&t=tok123')
         await pg.click('#srvSave'); await pg.wait_for_timeout(1500)
         cfg = await pg.evaluate("JSON.parse(localStorage.getItem('ctp:server'))")

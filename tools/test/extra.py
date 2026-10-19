@@ -4,7 +4,7 @@ from playwright.async_api import async_playwright
 URL='http://127.0.0.1:8765/index.html'
 async def main():
     async with async_playwright() as p:
-        b=await p.chromium.launch();ctx=await b.new_context(viewport={'width':412,'height':915});pg=await ctx.new_page()
+        b=await p.chromium.launch();ctx=await b.new_context(viewport={'width':412,'height':915});await ctx.add_init_script("localStorage.setItem('ctp5:noseed','1')");pg=await ctx.new_page()
         errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
         await pg.goto(URL);await pg.wait_for_timeout(400);await pg.click('[data-pick="thephilosopher"]');await pg.wait_for_timeout(300)
         # v4 záloha {profile,data} pre bociana → ide k bocianovi, nie ku mne

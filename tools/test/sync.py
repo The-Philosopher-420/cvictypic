@@ -11,6 +11,7 @@ def dump():
 async def new_device(p, name):
     b = await p.chromium.launch()
     ctx = await b.new_context(viewport={'width': 412, 'height': 915})
+    await ctx.add_init_script("localStorage.setItem('ctp5:noseed','1')")
     page = await ctx.new_page()
     errs = []
     page.on('pageerror', lambda e: errs.append(name + ': ' + str(e)))
