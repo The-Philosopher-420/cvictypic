@@ -242,7 +242,7 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
    CVIČ TY PIČ v5 · zápis a tracking tréningov · 1 súbor, bez API
    Schéma záznamov: SCHEMA=5 (pozri NAVOD.md / docs/SCHEMA.md)
    ===================================================================== */
-const APP_VERSION='5.2.0';
+const APP_VERSION='5.2.1';
 /* aktivity mimo silového plánu: HIIT (minúty) a LIIT (kilometre + minúty); staré druhy z v4 ostávajú čitateľné */
 const ACT_META={HIIT:{n:'HIIT',sub:'intervaly · minúty',pic:'H'},LIIT:{n:'LIIT',sub:'km + minúty',pic:'L'},LISS:{n:'LISS',sub:'',pic:'L'},MOB:{n:'Mobilita',sub:'',pic:'K'},OTHER:{n:'Iné',sub:'',pic:'K'}};
 const SCHEMA=5;
@@ -450,7 +450,13 @@ function sameContent(a,b){const n=x=>{const o=stripLocal(x);META_KEYS.forEach(k=
 /* server má kanonickú verziu (migrácia s flagmi, náhrobky) – lokálny záznam ju prevezme */
 function adoptRemote(rec,rj,sha){Object.keys(rec).forEach(k=>delete rec[k]);Object.assign(rec,rj,{_sha:sha,_dirty:false});}
 /* záznam z migrácie starých dát telefónu: ak ho server už má (aj ako zmazaný), serverová verzia platí – nič sa nestratí, história je v zálohe */
-const takesRemote=(loc,rj)=>sameContent(rj,loc)||(loc._legacy&&rj.deleted);
+/* kópia vstavanej histórie (seed): _seedh = odtlačok obsahu zo seedu. Nedotknutá kópia je staršia než čokoľvek na serveri → server platí;
+   ak server má nedotknutú kópiu a ja som záznam upravil/zmazal → platí moja zmena. Obe strany zmenené = konflikt (obe verzie ostanú). */
+const hstr=s=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);};
+function seedHash(r){const o=stripLocal(r);META_KEYS.forEach(k=>delete o[k]);return hstr(JSON.stringify(canon(o)));}
+const isSeedCopy=loc=>!!(loc._legacy&&loc._seedh!=null&&seedHash(loc)===loc._seedh);
+const remoteIsSeed=(loc,rj)=>!!(loc._legacy&&loc._seedh!=null&&seedHash(rj)===loc._seedh);
+const takesRemote=(loc,rj)=>sameContent(rj,loc)||isSeedCopy(loc)||(loc._legacy&&rj.deleted&&loc._seedh==null);
 async function pushRecord(map,rec,path,u,kind){
  const text=recText(rec);
  const r=await ghPut(path,text,rec._sha);
@@ -460,6 +466,7 @@ async function pushRecord(map,rec,path,u,kind){
  let rj=null;try{rj=JSON.parse(remote.text);}catch(e){}
  if(rj&&deepEq(rj,stripLocal(rec))){rec._sha=remote.sha;rec._dirty=false;delete rec._legacy;return 'same';}
  if(rj&&takesRemote(rec,rj)){adoptRemote(rec,rj,remote.sha);return 'same';}
+ if(rj&&remoteIsSeed(rec,rj)){const r4=await ghPut(path,text,remote.sha);if(!r4.conflict){rec._sha=r4.sha;rec._dirty=false;delete rec._legacy;return 'ok';}}
  /* skutočný konflikt: lokálnu verziu uložíme ako nový záznam, serverová ostáva */
  const local=stripLocal(rec);const cid=rec.id+'~k'+uid().slice(0,4);
  const copy=Object.assign({},local,{id:cid,conflict_of:rec.id,conflict_dev:dev,updated:Date.now()});
@@ -508,7 +515,8 @@ async function syncUser(u){
   const got=await ghGetMany(need.map(f=>`${dir}/${f.name}`)); /* jedna požiadavka namiesto N (Google server) */
   for(const f of need){const id=f.name.slice(0,-5);const loc=map[id];
    const g=got[`${dir}/${f.name}`];if(!g)continue;let rj;try{rj=JSON.parse(g.text);}catch(e){continue;}
-   if(loc&&loc._dirty&&!deepEq(rj,stripLocal(loc))&&!takesRemote(loc,rj)){ // lokálne zmeny + iný server = konflikt → obe
+   if(loc&&loc._dirty&&!deepEq(rj,stripLocal(loc))&&!takesRemote(loc,rj)){ // lokálne zmeny + iný server
+    if(remoteIsSeed(loc,rj)){loc._sha=g.sha;continue;} // server má nedotknutú históriu → platí moja úprava (pošle sa v kroku 3)
     const cid=id+'~k'+uid().slice(0,4);map[cid]=Object.assign(stripLocal(loc),{id:cid,conflict_of:id,conflict_dev:dev,updated:Date.now(),_dirty:true});res.conflicts++;}
    map[id]=Object.assign(rj,{_sha:g.sha,_dirty:false});res.pulled++;}
  }
@@ -555,16 +563,18 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
    Doplní sa raz (podľa verzie) len to, čo v telefóne chýba; so serverom sa potom zladí ako záznamy z migrácie (_legacy). */
 const SEED_VER='2026-10-19';
 async function applySeed(){
- const meta=LS.get(K.meta)||{};if(meta.seedVer===SEED_VER)return 0;try{if(localStorage.getItem('ctp5:noseed'))return 0;}catch(e){} /* testy */
+ const meta=LS.get(K.meta)||{};if(meta.seedVer===SEED_VER&&meta.seedTag===SEED_VER)return 0;try{if(localStorage.getItem('ctp5:noseed'))return 0;}catch(e){} /* testy */
  let seed=null;try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),8000);const r=await fetch('seed.json?v='+SEED_VER,{cache:'no-store',signal:ctl.signal});clearTimeout(t);if(r.ok)seed=await r.json();}catch(e){}
  if(!seed||!seed.users)return 0;
- let n=0;
+ let n=0;const first=meta.seedVer!==SEED_VER; /* first=false: seed bol doplnený už v5.2.0 → len označiť kópie a chýbajúce (zmazané používateľom) uložiť ako zmazané */
  (seed.profiles||[]).forEach(sp=>{if(!PROFILES.some(p=>p.id===sp.id)){PROFILES.push(Object.assign({},sp));LS.set(K.profiles,PROFILES);}});
  Object.entries(seed.users).forEach(([u,d])=>{if(!profile(u))return;if(!DB.w[u])loadUser(u);
-  Object.values(d.w||{}).forEach(w=>{if(!DB.w[u][w.id]&&!validateWorkout(w).length){DB.w[u][w.id]=Object.assign({},w,{_dirty:true,_legacy:true});n++;}});
-  Object.values(d.a||{}).forEach(a=>{if(!DB.a[u][a.id]&&!validateActivity(a).length){DB.a[u][a.id]=Object.assign({},a,{_dirty:true,_legacy:true});n++;}});
+  [['w',validateWorkout],['a',validateActivity]].forEach(([k,val])=>{const map=DB[k][u];Object.values(d[k]||{}).forEach(r=>{if(val(r).length)return;const h=seedHash(r);const loc=map[r.id];
+   if(!loc){if(first){map[r.id]=Object.assign({},r,{_dirty:true,_legacy:true,_seedh:h});n++;}else if(!r.deleted&&r.src!=='check'){map[r.id]=Object.assign({},r,{deleted:true,updated:Date.now(),dev},{_dirty:true,_legacy:true,_seedh:h});n++;}}
+   else if(loc._legacy&&loc._dirty&&loc._seedh==null&&seedHash(loc)===h)loc._seedh=h; /* len nedotknutá kópia; záznam zo starého v4 telefónu sa neoznačí */
+  });});
   persist(u);});
- meta.seedVer=SEED_VER;LS.set(K.meta,meta);return n;
+ meta.seedVer=SEED_VER;meta.seedTag=SEED_VER;LS.set(K.meta,meta);return n;
 }
 /* =====================================================================
    MIGRÁCIA STARÝCH LOKÁLNYCH DÁT (v1–v4 v localStorage telefónu) → v5 záznamy
@@ -710,7 +720,7 @@ function renderActEditor(){
  $('actNote').oninput=e=>{ACT.note=e.target.value;};
  $('actDone').onclick=()=>{if(!(+ACT.min||0)&&!(+ACT.km||0)){toast('Zadaj minúty alebo km');return;}saveAct();closeSheet('shAct');renderCurrent();toast('Aktivita uložená ✓');};
  $('actClose').onclick=()=>{closeSheet('shAct');};$('actBd').onclick=()=>closeSheet('shAct');
- const del=$('actDel');if(del)del.onclick=async()=>{if(await ask('Zmazať túto aktivitu? (na serveri ostane ako zmazaná)',{ok:'Zmazať',danger:true})){const ex=DB.a[u][ACT.id];if(ex){if(ex._sha){ex.deleted=true;markDirty(ex);}else delete DB.a[u][ACT.id];persist(u);scheduleSync();}closeSheet('shAct');renderCurrent();toast('Zmazané');}};
+ const del=$('actDel');if(del)del.onclick=async()=>{if(await ask('Zmazať túto aktivitu? (na serveri ostane ako zmazaná)',{ok:'Zmazať',danger:true})){const ex=DB.a[u][ACT.id];if(ex){if(ex._sha||ex._legacy){ex.deleted=true;markDirty(ex);}else delete DB.a[u][ACT.id];persist(u);scheduleSync();}closeSheet('shAct');renderCurrent();toast('Zmazané');}};
 }
 function saveAct(){
  const u=ME.id;const o=JSON.parse(JSON.stringify(ACT));delete o._exists;
@@ -750,7 +760,7 @@ function logFlush(now){
   const u=ME.id;const o=cleanLog();const errs=validateWorkout(o);
   if(errs.length){st.textContent='✗ '+errs[0];st.className='savestate err';return;}
   if(logHasContent()){DB.w[u][o.id]=Object.assign(DB.w[u][o.id]||{},o,{_dirty:true});LOG._exists=true;}
-  else if(DB.w[u][o.id]){const ex=DB.w[u][o.id];if(ex._sha){ex.deleted=true;markDirty(ex);}else delete DB.w[u][o.id];LOG._exists=false;}
+  else if(DB.w[u][o.id]){const ex=DB.w[u][o.id];if(ex._sha||ex._legacy){ex.deleted=true;markDirty(ex);}else delete DB.w[u][o.id];LOG._exists=false;}
   persist(u);st.textContent='uložené ✓';st.className='savestate ok';scheduleSync();
   const hl=$('histList');if(hl){hl.innerHTML=histHTML(u);bindHist(hl);}
  };
@@ -778,8 +788,8 @@ function renderLogEditor(){
  $('logAddSel').onchange=e=>{const v=e.target.value;if(!v)return;LOG.entries.push(v==='__custom'?{id:uid(),exercise_id:'c:'+uid().slice(0,6),nm:'Nový cvik',order:LOG.entries.length,sets:[{w:0,r:0,d:0},{w:0,r:0,d:0}],user_id:u,schema_version:SCHEMA,ts:LOG.date+'T00:00'}:{id:uid(),exercise_id:v,nm:'',order:LOG.entries.length,sets:[{w:0,r:0,d:0},{w:0,r:0,d:0}],user_id:u,schema_version:SCHEMA,ts:LOG.date+'T00:00'});e.target.value='';renderLogEditor();const rows=$('logItems').children;const last=rows[rows.length-1];if(last){last.scrollIntoView({behavior:'smooth',block:'center'});if(v==='__custom'){const nm=last.querySelector('input.nm');nm.focus();nm.select();}}};
  $('logDone').onclick=()=>{clearTimeout(logSaveT);logFlush(true);closeSheet('shLog');renderCurrent();if(logHasContent())toast('Zápis uložený ✓');};
  $('logClose').onclick=()=>{clearTimeout(logSaveT);logFlush(true);closeSheet('shLog');renderCurrent();};
- const del=$('logDel');if(del)del.onclick=async()=>{if(await ask('Zmazať tento zápis? (ostane v zálohe na serveri ako zmazaný)',{ok:'Zmazať',danger:true})){const ex=DB.w[u][LOG.id];if(ex){if(ex._sha){ex.deleted=true;markDirty(ex);}else delete DB.w[u][LOG.id];persist(u);scheduleSync();}closeSheet('shLog');renderCurrent();toast('Zmazané');}};
- const mv=$('logMove');if(mv)mv.onchange=async e=>{const to=e.target.value;if(!to)return;const tp=profile(to);if(await ask(`Presunúť tento zápis používateľovi <b>${esc(tp.name)}</b>? U teba sa označí ako zmazaný.`,{ok:'Presunúť'})){clearTimeout(logSaveT);logFlush(true);const src=DB.w[u][LOG.id];if(!src){e.target.value='';return;}if(!DB.w[to])loadUser(to);const copy=JSON.parse(JSON.stringify(stripLocal(src)));copy.id=uid();copy.user_id=to;copy.entries.forEach(x=>x.user_id=to);copy.moved_from=u+':'+src.id;copy.updated=Date.now();copy.dev=dev;const errs=validateWorkout(copy);if(errs.length){toast('Presun zlyhal: '+errs[0]);return;}DB.w[to][copy.id]=Object.assign(copy,{_dirty:true});if(src._sha){src.deleted=true;src.moved_to=to+':'+copy.id;markDirty(src);}else delete DB.w[u][src.id];persist(to);persist(u);scheduleSync();closeSheet('shLog');renderCurrent();toast('Presunuté → '+tp.name);}else e.target.value='';};
+ const del=$('logDel');if(del)del.onclick=async()=>{if(await ask('Zmazať tento zápis? (ostane v zálohe na serveri ako zmazaný)',{ok:'Zmazať',danger:true})){const ex=DB.w[u][LOG.id];if(ex){if(ex._sha||ex._legacy){ex.deleted=true;markDirty(ex);}else delete DB.w[u][LOG.id];persist(u);scheduleSync();}closeSheet('shLog');renderCurrent();toast('Zmazané');}};
+ const mv=$('logMove');if(mv)mv.onchange=async e=>{const to=e.target.value;if(!to)return;const tp=profile(to);if(await ask(`Presunúť tento zápis používateľovi <b>${esc(tp.name)}</b>? U teba sa označí ako zmazaný.`,{ok:'Presunúť'})){clearTimeout(logSaveT);logFlush(true);const src=DB.w[u][LOG.id];if(!src){e.target.value='';return;}if(!DB.w[to])loadUser(to);const copy=JSON.parse(JSON.stringify(stripLocal(src)));copy.id=uid();copy.user_id=to;copy.entries.forEach(x=>x.user_id=to);copy.moved_from=u+':'+src.id;copy.updated=Date.now();copy.dev=dev;const errs=validateWorkout(copy);if(errs.length){toast('Presun zlyhal: '+errs[0]);return;}DB.w[to][copy.id]=Object.assign(copy,{_dirty:true});if(src._sha||src._legacy){src.deleted=true;src.moved_to=to+':'+copy.id;markDirty(src);}else delete DB.w[u][src.id];persist(to);persist(u);scheduleSync();closeSheet('shLog');renderCurrent();toast('Presunuté → '+tp.name);}else e.target.value='';};
  bindLogItems();
  makeSortable($('logItems'),'.lex','[data-grip]',keys=>{const by={};LOG.entries.forEach(x=>by[x.id]=x);LOG.entries=keys.map(k=>by[k]).filter(Boolean);logFlush();});
 }
@@ -1174,6 +1184,7 @@ function gameOver(st){
  setSyncDot();
  const me=LS.get(K.me);
  if(me&&profile(me))login(me);else{renderPick();openSheet('shPick');}
+ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){} /* požiadať prehliadač, aby dáta appky nikdy sám nezmazal */
  if('serviceWorker' in navigator&&location.protocol==='https:'){try{navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}}
  setInterval(()=>{if(ME&&srvOn()&&document.visibilityState==='visible'&&!SRV.busy)syncAll('interval');},5*60000);
 })();

@@ -33,6 +33,11 @@ Celá história (všetky tréningy od augusta 2026, zo všetkých starých verzi
 - GitHub repozitár s tokenom ostáva ako voliteľná alternatíva (Nastavenia → Server → GitHub).
 - Nastavenia → Diagnostika ukáže verziu, server, počty záznamov a či sú v tomto prehliadači staré v4 dáta.
 
+## Aktualizácie appky (dáta sa nestratia)
+- Dáta sú v telefóne (úložisko prehliadača pre adresu appky) a na serveri. Nová verzia appky mení len kód; úložisko nemaže a pred každým nasadením prejde test `tools/test/upgrade.py` (stará verzia zapíše dáta → nová verzia → každý záznam musí ostať nezmenený).
+- Dáta zmizne len ak: v prehliadači vymažeš údaje stránok / cache „všetko“, odinštaluješ appku z plochy (iPhone) alebo ju otváraš v inom prehliadači/ikone. Preto: server zapnutý + občas Nastavenia → Záloha JSON.
+- Appka žiada prehliadač o trvalé úložisko (nezmaže ho sám pri nedostatku miesta).
+
 ## Sync a zálohy
 - Bodka pri mene: zelená = synchronizované, oranžová = prebieha, sivá = bez servera alebo server práve neodpovedá (zapisuje sa do telefónu, pošle sa neskôr; detail v Nastaveniach). Nič nebliká na červeno.
 - Konflikt (dve zariadenia zmenili ten istý zápis) sa nikdy neprepíše: obe verzie ostanú, označené „konflikt“ v Nastaveniach – otvor a zmaž tú zlú.
