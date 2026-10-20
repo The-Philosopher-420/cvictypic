@@ -242,7 +242,7 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
    CVIČ TY PIČ v5 · zápis a tracking tréningov · 1 súbor, bez API
    Schéma záznamov: SCHEMA=5 (pozri NAVOD.md / docs/SCHEMA.md)
    ===================================================================== */
-const APP_VERSION='5.2.1';
+const APP_VERSION='5.2.2';
 /* aktivity mimo silového plánu: HIIT (minúty) a LIIT (kilometre + minúty); staré druhy z v4 ostávajú čitateľné */
 const ACT_META={HIIT:{n:'HIIT',sub:'intervaly · minúty',pic:'H'},LIIT:{n:'LIIT',sub:'km + minúty',pic:'L'},LISS:{n:'LISS',sub:'',pic:'L'},MOB:{n:'Mobilita',sub:'',pic:'K'},OTHER:{n:'Iné',sub:'',pic:'K'}};
 const SCHEMA=5;
@@ -498,19 +498,24 @@ function mergePlan(local,remote){ // novší plán vyhráva, starší ostáva ak
  const out=Object.assign({},a);out.prev=stripLocal(Object.assign({},b,{prev:undefined}));out.updated=Date.now();return out;
 }
 function mergeAi(local,remote){return (local.updated||0)>=(remote.updated||0)?local:remote;}
+/* paralelne (Google server je pomalý na požiadavku, nie na prácu): zápisy po 4, čítania naraz. GitHub = postupne (súbežné commity by kolidovali). */
+async function pool(jobs,n){let i=0,err=null;const run=async()=>{while(!err&&i<jobs.length){const j=jobs[i++];try{await j();}catch(e){err=err||e;}}};await Promise.all(Array.from({length:Math.max(1,Math.min(n,jobs.length))},run));if(err)throw err;}
+const par=()=>useGh()?1:4;
+let SYNC_N=0;function syncTick(){SYNC_N++;const st=$('srvStatus');if(st&&SRV.busy)st.textContent='⏳ Synchronizujem… '+SYNC_N+' – nechaj appku otvorenú';}
 async function syncUser(u){
  const res={pushed:0,pulled:0,conflicts:0};
  /* 1. push lokálne zmeny (záznamy z migrácie starého telefónu až v kroku 3 – najprv treba vidieť, čo server má) */
- const pushDirty=async legacyPass=>{for(const [kind,map] of [['w',DB.w[u]||{}],['a',DB.a[u]||{}]]){for(const rec of Object.values(map)){if(!rec._dirty||(!legacyPass&&rec._legacy))continue;
+ const pushDirty=async legacyPass=>{const jobs=[];for(const [kind,map] of [['w',DB.w[u]||{}],['a',DB.a[u]||{}]]){for(const rec of Object.values(map)){if(!rec._dirty||(!legacyPass&&rec._legacy))continue;
   if(legacyPass&&rec._legacy&&kind==='w'&&rec.src==='check'&&shadowedCheck(u,rec)){delete map[rec.id];continue;} // check-in z telefónu, server má v tom týždni meranie → zbytočný
-  const errs=kind==='w'?validateWorkout(rec):validateActivity(rec);if(errs.length){console.warn('neplatný záznam, nepushujem',rec.id,errs);continue;}const st=await pushRecord(map,rec,kind==='w'?PATH.w(u,rec.id):PATH.a(u,rec.id),u,kind);res.pushed++;if(st==='conflict')res.conflicts++;}}};
+  const errs=kind==='w'?validateWorkout(rec):validateActivity(rec);if(errs.length){console.warn('neplatný záznam, nepushujem',rec.id,errs);continue;}jobs.push(async()=>{const st=await pushRecord(map,rec,kind==='w'?PATH.w(u,rec.id):PATH.a(u,rec.id),u,kind);res.pushed++;if(st==='conflict')res.conflicts++;syncTick();});}}
+  await pool(jobs,par());};
  await pushDirty(false);
  if(DB.plan[u]&&DB.plan[u]._dirty){await pushDoc(()=>DB.plan[u],v=>{DB.plan[u]=v;},PATH.plan(u),u,mergePlan);res.pushed++;}
  for(const m of Object.keys(DB.cal[u]||{})){const c=DB.cal[u][m];if(c&&c._dirty){const st=await pushDoc(()=>DB.cal[u][m],v=>{DB.cal[u][m]=v;},PATH.cal(u,m),u,mergeCal);res.pushed++;if(st==='merged')res.conflicts++;}}
  if(DB.ai[u]&&DB.ai[u]._dirty){await pushDoc(()=>DB.ai[u],v=>{DB.ai[u]=v;},PATH.ai(u),u,mergeAi);res.pushed++;}
- /* 2. pull – len súbory, ktorých sha nepoznáme */
- for(const [kind,map,dir] of [['w',DB.w[u],`kv/${u}/w`],['a',DB.a[u],`kv/${u}/a`]]){
-  const files=await ghList(dir);
+ /* 2. pull – len súbory, ktorých sha nepoznáme (5 nezávislých čítaní naraz) */
+ const pullDir=async([kind,map,dir])=>{
+  const files=await ghList(dir);syncTick();
   const need=files.filter(f=>f.name.endsWith('.json')&&!(map[f.name.slice(0,-5)]&&map[f.name.slice(0,-5)]._sha===f.sha));
   const got=await ghGetMany(need.map(f=>`${dir}/${f.name}`)); /* jedna požiadavka namiesto N (Google server) */
   for(const f of need){const id=f.name.slice(0,-5);const loc=map[id];
@@ -519,10 +524,13 @@ async function syncUser(u){
     if(remoteIsSeed(loc,rj)){loc._sha=g.sha;continue;} // server má nedotknutú históriu → platí moja úprava (pošle sa v kroku 3)
     const cid=id+'~k'+uid().slice(0,4);map[cid]=Object.assign(stripLocal(loc),{id:cid,conflict_of:id,conflict_dev:dev,updated:Date.now(),_dirty:true});res.conflicts++;}
    map[id]=Object.assign(rj,{_sha:g.sha,_dirty:false});res.pulled++;}
- }
- const pl=await ghGet(PATH.plan(u));if(pl){if(!DB.plan[u]||DB.plan[u]._sha!==pl.sha){try{const rj=JSON.parse(pl.text);if(!(DB.plan[u]&&DB.plan[u]._dirty))DB.plan[u]=Object.assign(rj,{_sha:pl.sha,_dirty:false});}catch(e){}}}
- const cals=await ghList(`kv/${u}/cal`);for(const f of cals){const m=f.name.slice(0,-5);const loc=(DB.cal[u]||{})[m];if(loc&&loc._sha===f.sha)continue;const g=await ghGet(`kv/${u}/cal/${f.name}`);if(!g)continue;try{const rj=JSON.parse(g.text);if(loc&&loc._dirty){DB.cal[u][m]=Object.assign(mergeCal(stripLocal(loc),rj),{_sha:g.sha,_dirty:true});}else{DB.cal[u]=DB.cal[u]||{};DB.cal[u][m]=Object.assign(rj,{_sha:g.sha,_dirty:false});}}catch(e){}}
- const ai=await ghGet(PATH.ai(u));if(ai&&(!DB.ai[u]||DB.ai[u]._sha!==ai.sha)&&!(DB.ai[u]&&DB.ai[u]._dirty)){try{DB.ai[u]=Object.assign(JSON.parse(ai.text),{_sha:ai.sha,_dirty:false});}catch(e){}}
+ };
+ const pullPlan=async()=>{const pl=await ghGet(PATH.plan(u));if(pl){if(!DB.plan[u]||DB.plan[u]._sha!==pl.sha){try{const rj=JSON.parse(pl.text);if(!(DB.plan[u]&&DB.plan[u]._dirty))DB.plan[u]=Object.assign(rj,{_sha:pl.sha,_dirty:false});}catch(e){}}}
+ };
+ const pullCal=async()=>{const cals=await ghList(`kv/${u}/cal`);for(const f of cals){const m=f.name.slice(0,-5);const loc=(DB.cal[u]||{})[m];if(loc&&loc._sha===f.sha)continue;const g=await ghGet(`kv/${u}/cal/${f.name}`);if(!g)continue;try{const rj=JSON.parse(g.text);if(loc&&loc._dirty){DB.cal[u][m]=Object.assign(mergeCal(stripLocal(loc),rj),{_sha:g.sha,_dirty:true});}else{DB.cal[u]=DB.cal[u]||{};DB.cal[u][m]=Object.assign(rj,{_sha:g.sha,_dirty:false});}}catch(e){}}
+ };
+ const pullAi=async()=>{const ai=await ghGet(PATH.ai(u));if(ai&&(!DB.ai[u]||DB.ai[u]._sha!==ai.sha)&&!(DB.ai[u]&&DB.ai[u]._dirty)){try{DB.ai[u]=Object.assign(JSON.parse(ai.text),{_sha:ai.sha,_dirty:false});}catch(e){}}};
+ await pool([()=>pullDir(['w',DB.w[u],`kv/${u}/w`]),()=>pullDir(['a',DB.a[u],`kv/${u}/a`]),pullPlan,pullCal,pullAi],useGh()?1:5);
  /* 3. záznamy z migrácie starého telefónu: čo server už mal, prevzalo sa v kroku 2 (rovnaký obsah / náhrobok); zvyšok je pre server nový → push. Konfliktné kópie z kroku 2 idú tiež. */
  await pushDirty(true);
  persist(u);return res;
@@ -544,7 +552,7 @@ let syncQueued=false,PROF_DIRTY=false;
 async function syncAll(reason){
  if(!srvOn()||!navigator.onLine){setSyncDot();return null;}
  if(SRV.busy){syncQueued=true;return null;}
- SRV.busy=true;setSyncDot();const tot={pushed:0,pulled:0,conflicts:0};
+ SRV.busy=true;SYNC_N=0;setSyncDot();const tot={pushed:0,pulled:0,conflicts:0};
  /* môj profil vždy; ostatní pri manuálnom/plnom syncu, pri čakajúcich zmenách, inak max raz za 30 min (šetrí dáta) */
  const full=['manual','setup','login','export','queued','test'].includes(reason)||Date.now()-(SRV.lastFull||0)>30*60000;
  try{if(full||PROF_DIRTY){await syncProfiles();PROF_DIRTY=false;}
