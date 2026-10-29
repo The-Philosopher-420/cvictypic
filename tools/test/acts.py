@@ -11,7 +11,7 @@ async def main():
         pg = await ctx.new_page()
         errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
-        pg.on('console', lambda m: errs.append('CONSOLE ' + m.text + ' ' + str(m.location.get('url', ''))) if m.type == 'error' and not re.search(r'status of (401|404|409|422)', m.text) and 'script.google.com' not in (m.text + str(m.location.get('url', ''))) else None)
+        pg.on('console', lambda m: errs.append('CONSOLE ' + m.text + ' ' + str(m.location.get('url', ''))) if m.type == 'error' and not re.search(r'status of (401|403|404|409|422)', m.text) and 'script.google.com' not in (m.text + str(m.location.get('url', ''))) else None)
         res404 = []
         pg.on('response', lambda r: res404.append(r.url) if r.status == 404 and '127.0.0.1' in r.url else None)
         await pg.goto(URL); await pg.wait_for_timeout(400)

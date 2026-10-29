@@ -92,7 +92,7 @@ async def phone(p, user, errs, n_seed):
     d = json.load(urllib.request.urlopen(MOCK + '/__dump'))
     puts = [l for l in d['log'] if l.startswith('PUT')][n_seed:]
     plan_puts = [x for x in puts if '/plan.json' in x]
-    other = [x for x in puts if '/plan.json' not in x]
+    other = [x for x in puts if '/plan.json' not in x and x != 'PUT kv/profiles.json']   # profiles.json: nové profily z kódu (jakub_d10, finak) idú na server
     assert not other, other            # nič okrem plánu z telefónu sa na server nezapísalo (žiadne kópie, žiadne oživené záznamy)
     print('phone PUT (len plán z v4 telefónu):', plan_puts)
     hist = await page.text_content('#histList')
@@ -111,7 +111,7 @@ async def main():
             st = await page.evaluate("""(()=>{const out={};for(const u of Object.keys(DB.w)){const ws=Object.values(DB.w[u]||{});out[u]={w:ws.filter(w=>!w.deleted).length,dead:ws.filter(w=>w.deleted).length,badUser:ws.filter(w=>w.user_id!==u).length,badEntries:ws.reduce((s,w)=>s+(w.entries||[]).filter(e=>e.user_id!==u||!e.exercise_id||e.schema_version!==5).length,0),flags:ws.filter(w=>w.flag).map(w=>w.id),a:Object.values((DB.a||{})[u]||{}).filter(a=>!a.deleted).length}}return {me:ME&&ME.id,profiles:PROFILES.map(p=>p.id),users:out}})()""")
             print(user, json.dumps(r), json.dumps(st, ensure_ascii=False))
             assert st['me'] == user, st
-            assert sorted(st['profiles']) == ['agiraa', 'bocian', 'thephilosopher'], st['profiles']
+            assert sorted(st['profiles']) == ['agiraa', 'bocian', 'finak', 'jakub_d10', 'thephilosopher'], st['profiles']
             for u, s in st['users'].items():
                 assert s['badUser'] == 0 and s['badEntries'] == 0, (u, s)
             assert st['users'].get(user, {'w': 0})['w'] == cnt, (user, st['users'])
