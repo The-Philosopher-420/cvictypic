@@ -242,7 +242,7 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
    CVIČ TY PIČ v5 · zápis a tracking tréningov · 1 súbor, bez API
    Schéma záznamov: SCHEMA=5 (pozri NAVOD.md / docs/SCHEMA.md)
    ===================================================================== */
-const APP_VERSION='5.2.2';
+const APP_VERSION='5.3.0';
 /* aktivity mimo silového plánu: HIIT (minúty) a LIIT (kilometre + minúty); staré druhy z v4 ostávajú čitateľné */
 const ACT_META={HIIT:{n:'HIIT',sub:'intervaly · minúty',pic:'H'},LIIT:{n:'LIIT',sub:'km + minúty',pic:'L'},LISS:{n:'LISS',sub:'',pic:'L'},MOB:{n:'Mobilita',sub:'',pic:'K'},OTHER:{n:'Iné',sub:'',pic:'K'}};
 const SCHEMA=5;
@@ -299,7 +299,9 @@ const CORE={
 const DEF_PROFILES=[
  {id:'thephilosopher',name:'ThePhilosopher',dia:true,goalMonth:16},
  {id:'bocian',name:'BociaN',dia:false,goalMonth:16},
- {id:'agiraa',name:'Agiraa',dia:false,goalMonth:16}
+ {id:'agiraa',name:'Agiraa',dia:false,goalMonth:16},
+ {id:'jakub_d10',name:'jakub_d10',dia:false,goalMonth:16},
+ {id:'finak',name:'Fiňak',dia:false,goalMonth:16}
 ];
 
 /* =====================================================================
@@ -1186,12 +1188,14 @@ function gameOver(st){
  loadServerConfig();
  PROFILES=LS.get(K.profiles)||[];
  if(!PROFILES.length){const old=LS.get('ctp:profiles');if(Array.isArray(old)&&old.length)PROFILES=old.map(p=>({id:p.id,name:p.name,dia:!!p.dia,goalMonth:16,created:p.created||today()}));else PROFILES=DEF_PROFILES.map(x=>Object.assign({created:today()},x));LS.set(K.profiles,PROFILES);}
+ DEF_PROFILES.forEach(d=>{if(!PROFILES.some(p=>p.id===d.id)){PROFILES.push(Object.assign({created:today()},d));PROF_DIRTY=true;}}); /* nové profily z kódu sa doplnia aj do starých telefónov (a cez server ostatným) */
+ if(PROF_DIRTY)LS.set(K.profiles,PROFILES);
  PROFILES.forEach(p=>loadUser(p.id));
  const n=migrateLocalLegacy();if(n)console.log('migrované lokálne záznamy:',n);
  const ns=await applySeed();if(ns)console.log('vstavaná história:',ns);
  setSyncDot();
  const me=LS.get(K.me);
- if(me&&profile(me))login(me);else{renderPick();openSheet('shPick');}
+ if(me&&profile(me))login(me);else{renderPick();openSheet('shPick');if(srvOn())syncAll('login').then(()=>{if(!ME)renderPick();});} /* nový telefón s odkazom: profily zo servera hneď vo výbere */
  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){} /* požiadať prehliadač, aby dáta appky nikdy sám nezmazal */
  if('serviceWorker' in navigator&&location.protocol==='https:'){try{navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}}
  setInterval(()=>{if(ME&&srvOn()&&document.visibilityState==='visible'&&!SRV.busy)syncAll('interval');},5*60000);

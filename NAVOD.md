@@ -28,6 +28,7 @@ Celá história (všetky tréningy od augusta 2026, zo všetkých starých verzi
 
 ## Server (zdieľanie medzi telefónmi)
 - **Google server – bez tokenov.** Kód je v `tools/server/Code.gs` a je už vložený v projekte na script.google.com (účet Xaviera). Zapnutie raz: script.google.com → projekt so skriptom → **Deploy → New deployment** → ⚙️ typ **Web app** → Execute as **Me**, Who has access **Anyone** → **Deploy** → skopíruj **Web app URL** (končí `/exec`) → v appke Nastavenia → Server → vlož → **Uložiť a otestovať**. Appka nahrá vstavanú históriu na server a odvtedy sa všetko zdieľa.
+- Profily: ThePhilosopher, BociaN, Agiraa, jakub_d10, Fiňak (každý má vlastné dáta, nikdy sa nemiešajú). Nový kamoš: pošli mu Nastavenia → 🔗 Odkaz → otvorí ho → vyberie svoje meno → hotovo.
 - Ostatné telefóny: Nastavenia → **🔗 Odkaz** (obsahuje adresu servera) → otvoriť na druhom telefóne (alebo adresu vložiť do Nastavenia → Server). Pozor: iPhone ikona na ploche má vlastné úložisko oddelené od Safari – odkaz treba otvoriť priamo v nej.
 - Zmena kódu servera: v editore skriptu uprav kód → Deploy → **Manage deployments** → ✏️ → Version: New version → Deploy (adresa ostáva). Dáta sú v Script Properties (gzip), limit ~500 kB ≈ niekoľko rokov tréningov; appka má zálohu JSON.
 - GitHub repozitár s tokenom ostáva ako voliteľná alternatíva (Nastavenia → Server → GitHub).
