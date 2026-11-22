@@ -209,7 +209,7 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
   <div class="pan center"><div class="grab"></div><p id="askMsg" style="margin:6px 0 16px"></p><div class="row" style="gap:8px"><button class="btn grow" id="askNo">Zrušiť</button><button class="btn pri grow" id="askYes">Áno</button></div></div>
 </div>
 <div class="sheet" id="shPick"><div class="bd" data-close="shPick"></div>
-  <div class="pan"><div class="grab"></div><div class="shead"><h2>Kto cvičí?</h2></div><p class="small mute" style="margin:0 0 10px">Každý zápis sa ukladá pod zvoleného používateľa. Bez výberu sa nič neuloží.</p><div class="pgrid" id="pickGrid"></div></div>
+  <div class="pan"><div class="grab"></div><div class="shead"><h2>Kto cvičí?</h2></div><p class="small mute" style="margin:0 0 10px">Každý zápis sa ukladá pod zvoleného používateľa. Bez výberu sa nič neuloží.</p><div class="pgrid" id="pickGrid"></div><div id="pickLink"></div></div>
 </div>
 <div class="sheet full" id="shLog"><div class="bd"></div>
   <div class="pan"><div class="grab"></div><div class="shead"><h2 id="logTitle">Zápis</h2><span class="savestate" id="logState"></span><button class="x" id="logClose">✕</button></div><div id="logBody"></div></div>
@@ -242,7 +242,7 @@ textarea{min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13p
    CVIČ TY PIČ v5 · zápis a tracking tréningov · 1 súbor, bez API
    Schéma záznamov: SCHEMA=5 (pozri NAVOD.md / docs/SCHEMA.md)
    ===================================================================== */
-const APP_VERSION='5.3.0';
+const APP_VERSION='5.3.2';
 /* aktivity mimo silového plánu: HIIT (minúty) a LIIT (kilometre + minúty); staré druhy z v4 ostávajú čitateľné */
 const ACT_META={HIIT:{n:'HIIT',sub:'intervaly · minúty',pic:'H'},LIIT:{n:'LIIT',sub:'km + minúty',pic:'L'},LISS:{n:'LISS',sub:'',pic:'L'},MOB:{n:'Mobilita',sub:'',pic:'K'},OTHER:{n:'Iné',sub:'',pic:'K'}};
 const SCHEMA=5;
@@ -387,6 +387,8 @@ function srvOn(){return !!(SRV.gas||SRV.gh);}
 function isGasUrl(s){s=String(s||'').trim();return /^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(s)||/^http:\/\/127\.0\.0\.1:\d+\/.*exec/.test(s);} /* 127.0.0.1 = testy */
 function loadServerConfig(){
  const saved=LS.get(K.server)||{};if(saved.gh&&saved.gh.token)SRV.gh=saved.gh;if(saved.gas&&isGasUrl(saved.gas.url))SRV.gas=saved.gas;
+ /* samooprava: do poľa GitHub token bol vložený odkaz/adresa namiesto tokenu → token zahodiť, odkaz na Google server použiť */
+ if(SRV.gh&&/[:\/#=\s]/.test(String(SRV.gh.token))){const t=String(SRV.gh.token);let u=t;if(/[#?&]srv=/.test(t)){try{u=new URLSearchParams(t.slice(t.indexOf('srv='))).get('srv')||'';}catch(e){u='';}}if(!SRV.gas&&isGasUrl(u))SRV.gas={url:u.trim(),key:DEFAULT_GAS.key};SRV.gh=null;saveServerConfig();}
  if(!SRV.gas&&DEFAULT_GAS.url)SRV.gas={url:DEFAULT_GAS.url,key:DEFAULT_GAS.key};
  parseHashConfig();
  window.addEventListener('hashchange',()=>{const before=JSON.stringify([SRV.gh,SRV.gas]);parseHashConfig();if(JSON.stringify([SRV.gh,SRV.gas])!==before){SRV.ok=null;setSyncDot();if(ME){renderCurrent();syncAll('setup');}}});
@@ -422,15 +424,15 @@ async function gh(method,path,body){
   return {status:r.status,json:await r.json()};
  }finally{clearTimeout(t);}
 }
-/* jednotné KV API nad oboma servermi: ghGet/ghList/ghPut/ghGetMany (GitHub má prednosť, ak je nastavený aj token) */
-const useGh=()=>!!SRV.gh;
+/* jednotné KV API nad oboma servermi: ghGet/ghList/ghPut/ghGetMany (Google server má prednosť; GitHub len ak Google nie je nastavený) */
+const useGh=()=>!!SRV.gh&&!SRV.gas;
 async function ghGet(path){if(!useGh()){const j=await gasCall({op:'get',path});return j.missing?null:{sha:j.sha,text:j.text};}const r=await gh('GET',path);if(r.status===404)return null;return {sha:r.json.sha,text:b64dec(r.json.content)};}
 async function ghList(path){if(!useGh()){const j=await gasCall({op:'list',dir:path});return j.files||[];}const r=await gh('GET',path);if(r.status===404)return [];return (Array.isArray(r.json)?r.json:[]).filter(x=>x.type==='file').map(x=>({name:x.name,sha:x.sha}));}
 async function ghPut(path,text,sha){if(!useGh()){const j=await gasCall({op:'put',path,text,sha:sha||undefined});if(j.conflict)return {conflict:true};return {sha:j.sha};}const body={message:'ctp '+path.replace(/^kv\//,''),content:b64enc(text)};if(sha)body.sha=sha;const r=await gh('PUT',path,body);if(r.status===409||r.status===422)return {conflict:true};return {sha:r.json.content.sha};}
 async function ghGetMany(paths){const out={};if(!paths.length)return out;if(!useGh()){for(let i=0;i<paths.length;i+=40){const j=await gasCall({op:'getmany',paths:paths.slice(i,i+40)});Object.assign(out,j.items||{});}return out;}for(const p of paths){const g=await ghGet(p);if(g)out[p]=g;}return out;}
 async function pingServer(){if(!srvOn())return false;try{if(useGh()){const g=SRV.gh;const r=await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}?ts=${Date.now()}`,{headers:{'Authorization':'Bearer '+g.token,'Accept':'application/vnd.github+json'},cache:'no-store'});if(!r.ok)throw new Error(r.status===401?'zlý token':r.status===404?'repozitár nenájdený':'GitHub '+r.status);}else{const j=await gasCall({op:'ping'});if(!j.ok)throw new Error('server neodpovedá');}SRV.ok=true;SRV.lastErr='';return true;}catch(e){SRV.ok=false;SRV.lastErr=e.message||String(e);return false;}}
-function shareLink(){const base=location.origin+location.pathname;if(SRV.gh)return base+'#gh='+encodeURIComponent(SRV.gh.owner+'/'+SRV.gh.repo)+'&t='+encodeURIComponent(SRV.gh.token);if(SRV.gas&&SRV.gas.url!==DEFAULT_GAS.url)return base+'#srv='+encodeURIComponent(SRV.gas.url)+(SRV.gas.key&&SRV.gas.key!==DEFAULT_GAS.key?'&k='+encodeURIComponent(SRV.gas.key):'');return base;}
-function srvLabel(){return SRV.gh?'GitHub '+SRV.gh.owner+'/'+SRV.gh.repo:SRV.gas?'Google server'+(SRV.gas.url===DEFAULT_GAS.url?' (vstavaný)':''):'';}
+function shareLink(){const base=location.origin+location.pathname;if(useGh())return base+'#gh='+encodeURIComponent(SRV.gh.owner+'/'+SRV.gh.repo)+'&t='+encodeURIComponent(SRV.gh.token);if(SRV.gas&&SRV.gas.url!==DEFAULT_GAS.url)return base+'#srv='+encodeURIComponent(SRV.gas.url)+(SRV.gas.key&&SRV.gas.key!==DEFAULT_GAS.key?'&k='+encodeURIComponent(SRV.gas.key):'');return base;}
+function srvLabel(){return useGh()?'GitHub '+SRV.gh.owner+'/'+SRV.gh.repo:SRV.gas?'Google server'+(SRV.gas.url===DEFAULT_GAS.url?' (vstavaný)':''):'';}
 
 /* =====================================================================
    SYNC · na úrovni záznamov. Lokálne polia: _sha (posledná známa verzia na serveri), _dirty.
@@ -629,7 +631,23 @@ function migrateLocalLegacy(){
 /* =====================================================================
    PROFILY · výber používateľa (každý telefón si ho pamätá)
    ===================================================================== */
-function renderPick(){$('pickGrid').innerHTML=PROFILES.map(p=>`<div class="pcard" data-pick="${p.id}">${esc(p.name)}</div>`).join('');}
+function renderPick(){$('pickGrid').innerHTML=PROFILES.map(p=>`<div class="pcard" data-pick="${p.id}">${esc(p.name)}</div>`).join('');
+ /* nová inštalácia bez servera (napr. iPhone ikona na ploche má vlastné úložisko): vloženie odkazu priamo vo výbere mena */
+ const pl=$('pickLink');if(!pl)return;
+ pl.innerHTML=srvOn()?'':`<p class="small mute" style="margin:16px 0 6px">Nevidíš svoje meno? Vlož sem odkaz, ktorý ti poslali:</p><input id="pickUrl" placeholder="https://…#srv=…" autocomplete="off"><button class="btn pri wide mt" id="pickGo">Pripojiť</button><div class="small mt" id="pickSt"></div>`;
+ const go=$('pickGo');if(go)go.onclick=async()=>{const st=$('pickSt');st.textContent='⏳ Pripájam a načítavam mená…';const err=await connectFromText($('pickUrl').value);if(err){st.innerHTML='<span class="err-text">'+esc(err)+'</span>';return;}renderPick();toast('Pripojené – vyber svoje meno');};
+}
+/* odkaz pre kamošov (#srv=… Google server, #gh=…&t=… GitHub) alebo holá adresa …/exec → nastaví server, otestuje, stiahne profily a dáta; '' = OK, inak text chyby */
+async function connectFromText(v){v=String(v||'').trim();if(!v)return 'Vlož odkaz.';
+ const prev={gh:SRV.gh,gas:SRV.gas};
+ if(/[#?&]gh=/.test(v)){try{const q=new URLSearchParams(v.slice(v.indexOf('gh=')));const g=q.get('gh'),t=q.get('t');const [owner,repo]=(g||'').split('/');if(owner&&repo&&t)SRV.gh={owner,repo,token:t};}catch(e){}}
+ else{if(/[#?&]srv=/.test(v)){try{const q=new URLSearchParams(v.slice(v.indexOf('srv=')));v=q.get('srv')||'';}catch(e){}}if(isGasUrl(v))SRV.gas={url:v.trim(),key:DEFAULT_GAS.key};}
+ if(SRV.gh===prev.gh&&SRV.gas===prev.gas)return 'Toto nie je odkaz na server – skopíruj celý odkaz, ktorý ti poslali.';
+ saveServerConfig();SRV.ok=null;const ok=await pingServer();setSyncDot();
+ if(!ok){SRV.gh=prev.gh;SRV.gas=prev.gas;saveServerConfig();setSyncDot();return 'Server neodpovedá ('+SRV.lastErr+'). Skús znova o chvíľu.';}
+ let t0=Date.now();while(SRV.busy&&Date.now()-t0<60000)await new Promise(r=>setTimeout(r,300));
+ await syncAll('login');return '';
+}
 $('pickGrid').addEventListener('click',e=>{const c=e.target.closest('[data-pick]');if(c){closeSheet('shPick');login(c.dataset.pick);}});
 function login(id){
  ME=profile(id);if(!ME)return;LS.set(K.me,id);loadUser(id);
@@ -947,7 +965,7 @@ function renderSet(){
   ${!srvOn()?`<div class="banner">História je vstavaná v appke, nové zápisy ostávajú zatiaľ len v tomto telefóne. Spoločný server (raz, 1 minúta): <b>script.google.com</b> → projekt so skriptom appky → <b>Deploy → New deployment</b> → typ <b>Web app</b> → Execute as <b>Me</b>, Who has access <b>Anyone</b> → Deploy → skopíruj <b>Web app URL</b> a vlož ju sem. Potom Nastavenia → 🔗 Odkaz pošli kamošom.</div>`:''}
   <div class="row" style="gap:8px"><button class="btn grow" id="syncNow">🔄 Synchronizovať</button>${srvOn()?'<button class="btn" id="srvShare">🔗 Odkaz</button>':''}</div>
   <details class="acc mt"${srvOn()?'':' open'}><summary>Nastavenie servera</summary><div class="body"><label class="lbl">Adresa Google servera (…/exec) alebo odkaz pre kamošov</label><input id="gasUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(SRV.gas?SRV.gas.url:'')}"><button class="btn wide mt" id="gasSave">Uložiť a otestovať</button><div class="small mt" id="srvStatus"></div>
-   <details class="acc mt"><summary>GitHub repozitár s tokenom (voliteľné)</summary><div class="body"><label class="lbl">GitHub repozitár s dátami</label><input id="ghRepo" placeholder="vlastník/názov" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:DEF_REPO)}"><label class="lbl">GitHub token alebo celý odkaz pre kamošov</label><input id="ghTok" type="password" placeholder="github_pat_… alebo https://…#gh=…&t=…" value="${esc(SRV.gh?SRV.gh.token:'')}"><button class="btn wide mt" id="srvSave">Uložiť a otestovať</button></div></details></div></details>
+   ${SRV.gh?`<details class="acc mt"><summary>GitHub repozitár s tokenom (voliteľné)</summary><div class="body"><label class="lbl">GitHub repozitár s dátami</label><input id="ghRepo" placeholder="vlastník/názov" value="${esc(SRV.gh?SRV.gh.owner+'/'+SRV.gh.repo:DEF_REPO)}"><label class="lbl">GitHub token alebo celý odkaz pre kamošov</label><input id="ghTok" type="password" placeholder="github_pat_… alebo https://…#gh=…&t=…" value="${esc(SRV.gh?SRV.gh.token:'')}"><button class="btn wide mt" id="srvSave">Uložiť a otestovať</button></div></details>`:''}</div></details>
   <details class="acc mt"><summary>Diagnostika tohto zariadenia</summary><div class="body small mute">${diagHTML()}</div></details>
  </div>
  <div class="card"><h3 class="mb">Inštalácia na plochu</h3>${installHTML()}</div>
@@ -962,15 +980,13 @@ function renderSet(){
  $('impMd').onclick=()=>openImport();
  $('syncNow').onclick=async()=>{if(!srvOn()){toast('Najprv nastav server (Nastavenie servera nižšie)');return;}toast('Synchronizujem…');const r=await syncAll('manual');if(r)toast(`Sync hotový: ↑${r.pushed} ↓${r.pulled}${r.conflicts?' ⚠️'+r.conflicts:''}`);else toast('Sync zlyhal: '+(SRV.lastErr||'offline'),3000);renderSet();};
  const sh=$('srvShare');if(sh)sh.onclick=async()=>{const l=shareLink();try{await navigator.clipboard.writeText(l);toast('Odkaz skopírovaný – obsahuje prístup k dátam, posielaj len kamošom');}catch(e){$('srvStatus').innerHTML='<span class="mono tiny" style="word-break:break-all">'+esc(l)+'</span>';}};
- $('srvSave').onclick=async()=>{let repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim();const st=$('srvStatus');
+ const ss=$('srvSave');if(ss)ss.onclick=async()=>{let repo=$('ghRepo').value.trim(),tok=$('ghTok').value.trim();const st=$('srvStatus');
+  if(/[#?&]srv=/.test(tok)||isGasUrl(tok)){st.textContent='⏳ Pripájam…';const err=await connectFromText(tok);if(err){st.innerHTML='<span class="err-text">'+esc(err)+'</span>';return;}toast('Pripojené k Google serveru');renderSet();return;} /* odkaz na Google server vložený do GitHub poľa */
   if(/[#?&]gh=/.test(tok)){try{const q=new URLSearchParams(tok.slice(tok.indexOf('gh=')));const g=q.get('gh');if(g&&q.get('t')){repo=g;tok=q.get('t');}}catch(e){}} /* vložený celý odkaz pre kamošov */
-  if(!repo||!tok){SRV.gh=null;saveServerConfig();st.textContent=srvOn()?'GitHub vypnutý – používa sa Google server.':'Server vypnutý – dáta len v telefóne.';setSyncDot();renderSet();return;}const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}SRV.gh={owner,repo:name,token:tok};saveServerConfig();st.textContent='Testujem…';const ok=await pingServer();setSyncDot();if(!ok){st.innerHTML='<span class="err-text">Server neodpovedá ('+esc(SRV.lastErr)+').</span>';return;}st.innerHTML='<span class="ok-text">✔ Spojené.</span>';await syncAll('setup');renderSet();};
+  if(!repo||!tok){SRV.gh=null;saveServerConfig();st.textContent=srvOn()?'GitHub vypnutý – používa sa Google server.':'Server vypnutý – dáta len v telefóne.';setSyncDot();renderSet();return;}const [owner,name]=repo.split('/');if(!owner||!name){st.textContent='Repozitár zadaj ako vlastník/názov';return;}const prevGh=SRV.gh;SRV.gh={owner,repo:name,token:tok};saveServerConfig();st.textContent='Testujem…';const ok=await pingServer();setSyncDot();if(!ok){const e=SRV.lastErr;SRV.gh=prevGh;saveServerConfig();SRV.ok=null;setSyncDot();st.innerHTML='<span class="err-text">Nepripojené ('+esc(e)+') – nič sa neuložilo.</span>';return;}st.innerHTML='<span class="ok-text">✔ Spojené.</span>';await syncAll('setup');renderSet();};
  $('gasSave').onclick=async()=>{let v=$('gasUrl').value.trim();const st=$('srvStatus');
-  if(/[#?&]gh=/.test(v)){$('ghTok').value=v;$('srvSave').onclick();return;} /* vložený GitHub odkaz pre kamošov */
-  if(/[#?&]srv=/.test(v)){try{const q=new URLSearchParams(v.slice(v.indexOf('srv=')));v=q.get('srv')||'';}catch(e){}}
   if(!v){SRV.gas=DEFAULT_GAS.url?{url:DEFAULT_GAS.url,key:DEFAULT_GAS.key}:null;saveServerConfig();st.textContent=SRV.gas?'Používa sa vstavaný server.':'Server vypnutý – dáta len v telefóne.';setSyncDot();renderSet();return;}
-  if(!isGasUrl(v)){st.innerHTML='<span class="err-text">Adresa má vyzerať ako https://script.google.com/macros/s/…/exec (Deploy → Web app URL).</span>';return;}
-  SRV.gas={url:v,key:DEFAULT_GAS.key};saveServerConfig();st.textContent='Testujem…';const ok=await pingServer();setSyncDot();if(!ok){st.innerHTML='<span class="err-text">Server neodpovedá ('+esc(SRV.lastErr)+'). Over, že deployment má prístup „Anyone“.</span>';return;}st.innerHTML='<span class="ok-text">✔ Spojené – synchronizujem…</span>';const r=await syncAll('setup');toast(r?`Server zapnutý: ↑${r.pushed} ↓${r.pulled}`:'Sync zlyhal: '+(SRV.lastErr||''),3500);renderSet();};
+  st.textContent='⏳ Pripájam a synchronizujem…';const err=await connectFromText(v);if(err){st.innerHTML='<span class="err-text">'+esc(err)+'</span>';return;}toast('Pripojené – dáta sú zosynchronizované',3500);renderSet();};
  const rm=$('diagRemigrate');if(rm)rm.onclick=()=>{const meta=LS.get(K.meta)||{};meta.legacy={};LS.set(K.meta,meta);const n=migrateLocalLegacy();toast(n?'Načítané: '+n+' záznamov':'Nič nové – staré dáta tu nie sú alebo už sú načítané',3500);scheduleSync();renderSet();};
  $('bkJson').onclick=()=>downloadText(`cvictypic-zaloha-${today()}.json`,JSON.stringify(backupPayload(),null,1),'application/json');
  $('bkRestore').onclick=()=>$('bkFile').click();
@@ -1195,7 +1211,7 @@ function gameOver(st){
  const ns=await applySeed();if(ns)console.log('vstavaná história:',ns);
  setSyncDot();
  const me=LS.get(K.me);
- if(me&&profile(me))login(me);else{renderPick();openSheet('shPick');if(srvOn())syncAll('login').then(()=>{if(!ME)renderPick();});} /* nový telefón s odkazom: profily zo servera hneď vo výbere */
+ if(me&&profile(me))login(me);else{renderPick();openSheet('shPick');if(srvOn())syncAll('login').then(()=>{const m=LS.get(K.me);if(!ME&&m&&profile(m)){closeSheet('shPick');login(m);}else if(!ME)renderPick();});} /* nový telefón s odkazom: profily zo servera hneď vo výbere */
  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){} /* požiadať prehliadač, aby dáta appky nikdy sám nezmazal */
  if('serviceWorker' in navigator&&location.protocol==='https:'){try{navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}}
  setInterval(()=>{if(ME&&srvOn()&&document.visibilityState==='visible'&&!SRV.busy)syncAll('interval');},5*60000);
