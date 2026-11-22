@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 URL = 'http://127.0.0.1:8765/index.html'
 MOCK = 'http://127.0.0.1:8766'
 DEPLOY = sys.argv[1] if len(sys.argv) > 1 else '/mnt/user-data/outputs/ctp/deploy/cvictypic-data'
-LEGACY = sys.argv[2] if len(sys.argv) > 2 else '/home/claude/data-sources/server/repo/kv'
+LEGACY = sys.argv[2] if len(sys.argv) > 2 else '/mnt/user-data/outputs/ctp/zaloha-2026-10-19/server-kv-v4-HEAD'
 
 def put(path, text):
     req = urllib.request.Request(MOCK + '/repos/o/r/contents/' + path, method='PUT',

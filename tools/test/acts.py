@@ -75,20 +75,23 @@ async def main():
         # diagnostika v nastaveniach
         await pg.click('[data-tab="set"]'); await pg.wait_for_timeout(200)
         s = await pg.text_content('#tab-set'); assert 'Diagnostika' in s and 'staré v4 dáta v tomto prehliadači: žiadne' in s and 'bez servera' in s and 'script.google.com' in s, s
-        # Google server: zlá adresa → hláška, odkaz pre kamošov #srv= → uloží sa adresa
-        await pg.fill('#gasUrl', 'https://example.com/nie'); await pg.click('#gasSave'); await pg.wait_for_timeout(200)
-        assert 'exec' in (await pg.text_content('#srvStatus')) and not (await pg.evaluate("localStorage.getItem('ctp:server')"))
-        await pg.fill('#gasUrl', 'https://app.x/#srv=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2FABC%2Fexec'); await pg.click('#gasSave'); await pg.wait_for_timeout(1500)
-        cfg = await pg.evaluate("JSON.parse(localStorage.getItem('ctp:server'))"); assert cfg['gas']['url'] == 'https://script.google.com/macros/s/ABC/exec', cfg
+        # server: zlý text → hláška; nedostupná adresa / GitHub odkaz so zlým tokenom → nič sa neuloží (žiadny pokazený stav); funkčný odkaz → uloží sa
+        assert not await pg.query_selector('#ghTok'), 'GitHub pole sa bez GitHubu neukazuje'
+        await pg.fill('#gasUrl', 'https://example.com/nie'); await pg.click('#gasSave'); await pg.wait_for_timeout(300)
+        assert 'nie je odkaz' in (await pg.text_content('#srvStatus')) and not (await pg.evaluate("localStorage.getItem('ctp:server')"))
+        await pg.fill('#gasUrl', 'https://app.x/#srv=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2FABC%2Fexec'); await pg.click('#gasSave'); await pg.wait_for_timeout(2500)
+        assert 'neodpovedá' in (await pg.text_content('#srvStatus')) and not (await pg.evaluate("localStorage.getItem('ctp:server')"))
+        await pg.fill('#gasUrl', 'https://x.y/app/#gh=o%2Fr&t=tok123'); await pg.click('#gasSave'); await pg.wait_for_timeout(2500)
+        assert not (await pg.evaluate("localStorage.getItem('ctp:server')")), 'zlý GitHub odkaz sa nesmie uložiť'
+        await pg.fill('#gasUrl', 'http://127.0.0.1:8765/index.html#srv=http%3A%2F%2F127.0.0.1%3A8767%2Fexec'); await pg.click('#gasSave')
+        for _ in range(80):
+            await pg.wait_for_timeout(250)
+            if await pg.evaluate("!!localStorage.getItem('ctp:server')&&!SRV.busy"): break
+        await pg.wait_for_timeout(500)
+        cfg = await pg.evaluate("JSON.parse(localStorage.getItem('ctp:server'))"); assert cfg['gas']['url'] == 'http://127.0.0.1:8767/exec' and 'gh' not in cfg, cfg
         await pg.click('summary:has-text("Nastavenie servera")'); await pg.wait_for_timeout(200)
         await pg.fill('#gasUrl', ''); await pg.click('#gasSave'); await pg.wait_for_timeout(300)
         assert not (await pg.evaluate("localStorage.getItem('ctp:server')"))
-        # vloženie celého odkazu pre kamošov do poľa token → repo + token sa rozparsujú (server mock nebeží → „neodpovedá“, ale konfigurácia sa uloží)
-        await pg.click('summary:has-text("GitHub repozitár s tokenom")'); await pg.wait_for_timeout(200)
-        await pg.fill('#ghRepo', ''); await pg.fill('#ghTok', 'https://x.y/app/#gh=o%2Fr&t=tok123')
-        await pg.click('#srvSave'); await pg.wait_for_timeout(1500)
-        cfg = await pg.evaluate("JSON.parse(localStorage.getItem('ctp:server'))")
-        assert cfg['gh']['owner'] == 'o' and cfg['gh']['repo'] == 'r' and cfg['gh']['token'] == 'tok123', cfg
         # minihra: 3 ťuky na logo
         await pg.click('[data-tab="train"]'); await pg.wait_for_timeout(100)
         for _ in range(3): await pg.click('#logo')
